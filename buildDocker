@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+# Mattermost User Merge Tool
+
+# Copyright (c) 2023 Maxwell Power
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without
+# restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom
+# the Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+# AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+REPO_NAME="ghcr.io/maxwellpower/mm-merge"
+
+function _prepareEnvironment() {
+  echo "Preparing buildx Environment"
+  docker pull tonistiigi/binfmt
+  docker run --privileged --rm tonistiigi/binfmt --install linux/amd64,linux/arm/v7,linux/arm64
+  docker buildx create --use --driver docker-container --name binfmt --platform=linux/amd64,linux/arm/v7,linux/arm64
+  docker buildx inspect --bootstrap
+}
+
+function _buildContainer() {
+  echo "Build Container and pushing to GitHub" $REPO_NAME
+  docker buildx build \
+    --tag $REPO_NAME:latest \
+    --platform linux/amd64,linux/arm/v7,linux/arm64 \
+    --push \
+    .
+}
+
+function _cleanupEnvironment() {
+  echo "Cleanup buildx Environment"
+  docker buildx rm binfmt
+  docker image rm tonistiigi/binfmt
+  echo "Cleanup Complete"
+}
+
+echo "Building Docker Image"
+_prepareEnvironment
+_buildContainer
+_cleanupEnvironment
+echo "DONE Building Docker Image"
