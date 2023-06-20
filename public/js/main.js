@@ -13,9 +13,18 @@
 // ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 function confirmSubmit(event) {
-    const result = confirm("Are you sure you want to merge these users?");
-    if (!result) {
-        event.preventDefault(); // Prevents the form from being submitted
+
+    const dryrun = document.getElementById("dry_run_checkbox").checked;
+    if (dryrun) {
+        const result = confirm("Perform dry run?\nDatabase changes will be rolled back!");
+        if (!result) {
+            event.preventDefault(); // Prevents the form from being submitted
+        }
+    } else {
+        const result = confirm("Are you sure you want to merge these users?\nChanges will be committed!\nThis cannot be undone!");
+        if (!result) {
+            event.preventDefault(); // Prevents the form from being submitted
+        }
     }
 }
 
@@ -105,3 +114,23 @@ function populateFields() {
 // Attach event listener to the new_user_id select box
 const newUserSelect = document.getElementById("new_user_id");
 newUserSelect.addEventListener("change", populateFields);
+
+function updateDebugCheckbox() {
+    const dryRunCheckbox = document.getElementById("dry_run_checkbox");
+    const debugCheckbox = document.getElementById("debug_checkbox");
+
+    if (dryRunCheckbox.checked) {
+        debugCheckbox.disabled = true;
+        debugCheckbox.checked = true;
+    } else {
+        debugCheckbox.disabled = false;
+    }
+}
+
+// Add an event listener to the "Dry Run" checkbox
+const dryRunCheckbox = document.getElementById("dry_run_checkbox");
+dryRunCheckbox.addEventListener("click", updateDebugCheckbox);
+
+// Call the function to set the initial state
+updateDebugCheckbox();
+

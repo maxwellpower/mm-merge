@@ -30,7 +30,34 @@ require_once 'inc/db.php';
     </div>
 <?php
 // Function to execute a SQL query
-function executeQuery($query): false|array
+function executeQuery($query, $dryRun = false, $debug = false): false|array
+{
+    global $pdo;
+    $pdo->beginTransaction();
+    $stmt = $pdo->prepare($query . " RETURNING *");
+    $stmt->execute();
+    if ($debug) {
+        echo "<div class='row mb-3 mt-3'><div class='col'><p><strong>QUERY</strong>: <code>$query</code></p><p><strong>RESULTS</strong>:</p></div></div>";
+        echo "<div class='row bg-dark border border-dark border-3 rounded mb-3 mt-3'><div class='col'><pre class='mt-2 text-light'><code>";
+        print_r(json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_PRETTY_PRINT));
+        echo "</code></pre></div></div>";
+    }
+    if ($dryRun) {
+        $pdo->rollBack();
+        if ($debug) {
+            echo "<p class='alert alert-success'><strong>NOTE</strong>: This was a dry run! Changes were not committed.</p>";
+        }
+        return false;
+    } else {
+        $pdo->commit();
+        if ($debug) {
+            echo "<p class='alert alert-danger'><strong>NOTE</strong>: Changes were committed!</p>";
+        }
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+function executeSELECTQuery($query): false|array
 {
     global $pdo;
     $stmt = $pdo->prepare($query);
@@ -39,15 +66,14 @@ function executeQuery($query): false|array
 }
 
 // Function to update the specified table with the new user ID
-function updateTable($table, $userIdColumn, $oldUserId, $newUserId): void
+function updateTable($table, $userIdColumn, $oldUserId, $newUserId, $dryRun, $debug): void
 {
-
     $query = "UPDATE $table SET $userIdColumn = '$newUserId' WHERE $userIdColumn = '$oldUserId'";
-    executeQuery($query);
+    executeQuery($query, $dryRun, $debug);
 }
 
 // Function to merge two users
-function mergeUsers($oldUserId, $newUserId): void
+function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun, $debug): void
 {
     $errorReported = false;
 
@@ -91,7 +117,7 @@ function mergeUsers($oldUserId, $newUserId): void
     foreach ($tables as $table => $userIdColumn) {
         echo "Updating $table...<br>";
         try {
-            updateTable($table, $userIdColumn, $oldUserId, $newUserId);
+            updateTable($table, $userIdColumn, $oldUserId, $newUserId, $dryRun, $debug);
         } catch (Exception $e) {
             echo "Error updating $table: <code>" . $e->getMessage() . "</code><br><br>";
             $errorReported = true;
@@ -102,7 +128,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Updating channelmembers...<br>";
     $query = "UPDATE channelmembers SET userid = '$newUserId' WHERE userid = '$oldUserId' AND channelid NOT IN (SELECT channelid FROM channelmembers WHERE userid = '$newUserId') AND channelid IN (SELECT id FROM channels WHERE type = 'O' or type = 'G')";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating channelmembers: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -112,7 +138,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Updating productnoticeviewstate ...<br>";
     $query = "DELETE from productnoticeviewstate WHERE userid = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating productnoticeviewstate: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -123,7 +149,7 @@ function mergeUsers($oldUserId, $newUserId): void
     $olddmchannelname = $oldUserId . '__' . $oldUserId;
     $query = "SELECT id FROM channels WHERE name = '$olddmchannelname' AND type = 'D'";
     try {
-        $results = executeQuery($query);
+        $results = executeSELECTQuery($query);
         @$olddmchannelid = $results[0]['id'];
     } catch (Exception $e) {
         echo "Could not select old channel name: <code>" . $e->getMessage() . "</code><br><br>";
@@ -133,7 +159,7 @@ function mergeUsers($oldUserId, $newUserId): void
     $newdmchannelname = $newUserId . '__' . $newUserId;
     $query = "SELECT id FROM channels WHERE name = '$newdmchannelname' AND type = 'D'";
     try {
-        $results = executeQuery($query);
+        $results = executeSELECTQuery($query);
         $newdmchannelid = $results[0]['id'];
     } catch (Exception $e) {
         echo "Could not select new channel name: <code>" . $e->getMessage() . "</code><br><br>";
@@ -152,7 +178,7 @@ function mergeUsers($oldUserId, $newUserId): void
     } else {
         $query = "UPDATE posts SET channelid = '$newdmchannelid' WHERE channelid = '$olddmchannelid'";
         try {
-            executeQuery($query);
+            executeQuery($query, $dryRun, $debug);
         } catch (Exception $e) {
             echo "Error updating DM posts: <code>" . $e->getMessage() . "</code><br><br>";
             $errorReported = true;
@@ -163,7 +189,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Removing users DM channel ...<br>";
     $query = "DELETE FROM channels WHERE name = '$olddmchannelname' AND type = 'D'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error deleting DM channel: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -171,9 +197,9 @@ function mergeUsers($oldUserId, $newUserId): void
 
     // Update DM Channels
     echo "Updating DM Channels ...<br>";
-    $query = "UPDATE channels SET name = REPLACE(name, '$oldUserId', '$newUserId') WHERE type = 'D' AND name != '$newdmchannelname'";
+    $query = "UPDATE channels SET name = REPLACE(name, '$oldUserId', '$newUserId') WHERE type = 'D' AND name != '$newdmchannelname' AND NOT EXISTS (SELECT 1 FROM channels WHERE name = '$newdmchannelname')";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating DM channels: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -185,7 +211,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Removing DM between old and new user ...<br>";
     $query = "DELETE FROM channels WHERE name = '$sharedmchannelname1' OR name = '$sharedmchannelname2' AND type = 'D'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error deleting DM channel: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -195,7 +221,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Updating channel creator ...<br>";
     $query = "UPDATE channels SET creatorid = '$newUserId' WHERE creatorid = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating channel creator: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -205,7 +231,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Updating focalboard_blocks ...<br>";
     $query = "UPDATE focalboard_blocks SET modified_by = '$newUserId' WHERE modified_by = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating focalboard_blocks: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -215,7 +241,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Updating focalboard_blocks_history ...<br>";
     $query = "UPDATE focalboard_blocks_history SET modified_by = '$newUserId' WHERE modified_by = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating focalboard_blocks: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -225,7 +251,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Updating boards history ...<br>";
     $query = "UPDATE focalboard_boards_history SET modified_by = '$newUserId' WHERE modified_by = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating focalboard_boards_history: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -235,7 +261,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Deleting focalboard preferences ...<br>";
     $query = "DELETE FROM focalboard_preferences WHERE userid = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating focalboard_preferences: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -245,7 +271,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Deleting board sessions ...<br>";
     $query = "DELETE FROM focalboard_sessions WHERE user_id = '$oldUserId' OR user_id = '$newUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating focalboard_sessions: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -255,7 +281,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Deleting focalboard account ...<br>";
     $query = "DELETE FROM focalboard_users WHERE id = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating focalboard_users: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -265,7 +291,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Replacing groupmembers ...<br>";
     $query = "UPDATE groupmembers SET userid = '$newUserId' WHERE userid = '$oldUserId' AND groupid NOT IN (SELECT groupid FROM groupmembers WHERE userid = '$newUserId')";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating groupmembers: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -275,7 +301,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Updating ir_incident commander ...<br>";
     $query = "UPDATE ir_incident SET commanderuserid = '$newUserId' WHERE commanderuserid = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating ir_incident commander: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -285,7 +311,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Updating ir_incident checklistsjson ...<br>";
     $query = "UPDATE ir_incident SET checklistsjson = (checklistsjson::text)::jsonb - '$oldUserId' || '\"$newUserId\"' WHERE checklistsjson::text LIKE '%$oldUserId%'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating ir_incident checklistsjson: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -295,7 +321,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Updating ir_timelineevent subjectuserid ...<br>";
     $query = "UPDATE ir_timelineevent SET subjectuserid = '$newUserId' WHERE subjectuserid = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating ir_timelineevent: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -305,14 +331,14 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Deleting oauth data ...<br>";
     $query = "DELETE FROM oauthaccessdata WHERE userid = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating oauthaccessdata: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
     }
     $query = "DELETE FROM oauthauthdata WHERE userid = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating oauthauthdata: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -331,9 +357,9 @@ function mergeUsers($oldUserId, $newUserId): void
         }
         $errorReported = true;
     } else {
-        $query = "UPDATE posts SET props = (props::text)::jsonb - '$oldUsername' || '$newUsername' WHERE props::text LIKE '%$oldUsername%'";
+        $query = "UPDATE posts SET props = props - '$oldUsername' || '{\"$newUsername\": true}' WHERE props::text LIKE '%$oldUsername%'";
         try {
-            executeQuery($query);
+            executeQuery($query, $dryRun, $debug);
         } catch (Exception $e) {
             echo "Error updating system posts props: <code>" . $e->getMessage() . "</code><br><br>";
             $errorReported = true;
@@ -343,7 +369,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Updating post props json ...<br>";
     $query = "UPDATE posts SET props = jsonb_set(props, '{userId}', '\"$newUserId\"') WHERE props->>'userId' = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating posts props: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -353,7 +379,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Deleting preferences ...<br>";
     $query = "DELETE FROM preferences WHERE userid = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating preferences: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -363,7 +389,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Removing sessions ...<br>";
     $query = "DELETE FROM sessions WHERE userid = '$oldUserId' OR userid = '$newUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating sessions: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -373,7 +399,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Removing old sidebar categories ...<br>";
     $query = "DELETE FROM sidebarcategories WHERE userid = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating sidebarcategories: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -383,7 +409,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Removing old status ...<br>";
     $query = "DELETE FROM status WHERE userid = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating status: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -393,7 +419,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Removing old team member ...<br>";
     $query = "DELETE FROM teammembers WHERE userid = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating teammembers: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -403,7 +429,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Deleting old account ...<br>";
     $query = "DELETE FROM users WHERE id = '$oldUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating users: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -414,7 +440,7 @@ function mergeUsers($oldUserId, $newUserId): void
         echo "Resetting authdata ...<br>";
         $query = "UPDATE users SET authdata = NULL WHERE id = '$newUserId'";
         try {
-            executeQuery($query);
+            executeQuery($query, $dryRun, $debug);
         } catch (Exception $e) {
             echo "Error updating authdata: <code>" . $e->getMessage() . "</code><br><br>";
             $errorReported = true;
@@ -427,7 +453,7 @@ function mergeUsers($oldUserId, $newUserId): void
         echo "Updating email address to <code>$force_email</code> ...<br>";
         $query = "UPDATE users SET email = '$force_email' WHERE id = '$newUserId'";
         try {
-            executeQuery($query);
+            executeQuery($query, $dryRun, $debug);
         } catch (Exception $e) {
             echo "Error updating email: <code>" . $e->getMessage() . "</code><br><br>";
             $errorReported = true;
@@ -440,7 +466,7 @@ function mergeUsers($oldUserId, $newUserId): void
         echo "Updating username to <code>$force_username</code> ...<br>";
         $query = "UPDATE users SET username = '$force_username' WHERE id = '$newUserId'";
         try {
-            executeQuery($query);
+            executeQuery($query, $dryRun, $debug);
         } catch (Exception $e) {
             echo "Error updating username: <code>" . $e->getMessage() . "</code><br><br>";
             $errorReported = true;
@@ -451,7 +477,7 @@ function mergeUsers($oldUserId, $newUserId): void
     echo "Enabling account ...<br>";
     $query = "UPDATE users SET deleteat = 0 WHERE id = '$newUserId'";
     try {
-        executeQuery($query);
+        executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error deleting user: <code>" . $e->getMessage() . "</code><br><br>";
         $errorReported = true;
@@ -472,9 +498,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="row mb-3">
             <div class="col-8 offset-2">
                 <h2 class="text-center">Post Data</h2>
-                <code>
+                <pre><code>
                     <?= json_encode($_POST, JSON_PRETTY_PRINT); ?>
-                </code>
+                </code></pre>
             </div>
         </div>
         <?php
@@ -485,10 +511,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $oldUserId = $_POST['old_user_id'];
     $newUserId = $_POST['new_user_id'];
 
+    // Set the dry run flag
+    $dryRun = $_POST['dry_run_checkbox'] ?? false;
+
+    if ($dryRun) {
+        $debug = true;
+    } else {
+        // Set the debug flag
+        $debug = $_POST['debug_checkbox'] ?? false;
+    }
     // Get the usernames
     $query = "SELECT username FROM users WHERE id = '$newUserId'";
     try {
-        $result = executeQuery($query);
+        $result = executeSELECTQuery($query);
         $newUsername = $result[0]['username'];
         if ($newUsername == "") {
             $newUsername = "Unknown";
@@ -500,7 +535,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $query = "SELECT username FROM users WHERE id = '$oldUserId'";
     try {
-        $result = executeQuery($query);
+        $result = executeSELECTQuery($query);
         @$oldUsername = $result[0]['username'];
         if ($oldUsername == "") {
             $oldUsername = "Unknown";
@@ -516,6 +551,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="row">
                 <div class="col text-center">
                     <h2>Merging <code><?= $oldUsername; ?></code> into <code><?= $newUsername; ?></code></h2>
+                    <?php
+                    // If dryrun is enabled, display a warning
+                    if ($dryRun) {
+                        echo "<p class='alert alert-warning text-center'><strong><i class='bi bi-exclamation-circle-fill'></i> Dry run enabled!</strong></p>";
+                    }
+                    if ($debug) {
+                        echo "<p class='alert alert-warning text-center'><strong><i class='bi bi-exclamation-circle-fill'></i> Debug enabled!</strong></p>";
+                    }
+                    ?>
                     <p><strong><i class="bi bi-database-fill"></i> Connected to</strong><span
                                 class="text-success"> <?= $PG_user . '@' . $PG_host . ':' . $PG_port; ?></span></p>
                 </div>
@@ -525,7 +569,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php
                     // Perform the merge
                     echo "<span class='text-success bg-light'>Starting merge ...</span><br>";
-                    mergeUsers($oldUserId, $newUserId);
+                    mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun, $debug);
                     ?>
                 </div>
             </div>
@@ -536,7 +580,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Fetch existing user accounts available to merge
     $query = "SELECT id, firstname, lastname, username, email FROM users WHERE email NOT LIKE '%@localhost' AND username
     NOT LIKE 'admin' ORDER BY lastname";
-    $users = executeQuery($query);
+    $users = executeSELECTQuery($query);
     ?>
     <div class="row">
         <div class="col text-center">
@@ -595,6 +639,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                         <div class="row alert alert-light mt-3">
                             <div class="col">
+                                <div class="row">
+                                    <div class="col">
+                                        <h2>Options</h2>
+                                    </div>
+                                </div>
+                                <div class="row alert alert-danger">
+                                    <div class="col">
+                                        <p><strong>DANGER</strong>: Unselecting will commit database changes!</p>
+                                        <div class="form-check form-switch form-check-inline mt-2">
+                                            <strong><label class="form-label" for="dry_run_checkbox">Dry Run</strong>
+                                            <input class="form-check-input" type="checkbox" role="switch"
+                                                   id="dry_run_checkbox" name="dry_run_checkbox"
+                                                   checked="checked" value="true">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col">
+                                        <div class="form-check form-switch form-check-inline mt-2">
+                                            <strong><label class="form-label" for="debug_checkbox">Debug Output</strong>
+                                            <input class="form-check-input" type="checkbox" role="switch"
+                                                   id="debug_checkbox" name="debug_checkbox"
+                                                   checked="checked" value="true">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row alert alert-light mt-3">
+                            <div class="col">
+                                <div class="row">
+                                    <div class="col">
+                                        <h2>User Options</h2>
+                                    </div>
+                                </div>
                                 <div class="row">
                                     <div class="col">
                                         <div class="form-check form-switch form-check-inline">
