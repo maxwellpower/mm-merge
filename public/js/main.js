@@ -16,14 +16,18 @@ function confirmSubmit(event) {
 
     const dryrun = document.getElementById("dry_run_checkbox").checked;
     if (dryrun) {
-        const result = confirm("Perform dry run?\nDatabase changes will be rolled back!");
+        const result = confirm("Perform Dry Run?\n\nDatabase changes will be rolled back!");
         if (!result) {
             event.preventDefault(); // Prevents the form from being submitted
+        } else {
+            alert("Performing Dry Run!\n\nThis may take a while!\n\nPlease be patient!");
         }
     } else {
-        const result = confirm("Are you sure you want to merge these users?\nChanges will be committed!\nThis cannot be undone!");
+        const result = confirm("Are you sure you want to merge these users?\n\nChanges will be committed!\n\nThis cannot be undone!");
         if (!result) {
             event.preventDefault(); // Prevents the form from being submitted
+        } else {
+            alert("Performing merge!\n\nThis may take a while!\n\nPlease be patient!");
         }
     }
 }
@@ -124,6 +128,7 @@ function updateDebugCheckbox() {
         debugCheckbox.checked = true;
     } else {
         debugCheckbox.disabled = false;
+        debugCheckbox.checked = false;
     }
 }
 

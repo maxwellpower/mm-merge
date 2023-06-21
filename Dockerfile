@@ -15,10 +15,11 @@
 FROM php:8.2-apache
 
 LABEL MAINTAINER="maxwell.power@mattermost.com"
-LABEL org.opencontainers.image.title = "mm-merge"
-LABEL org.opencontainers.image.description = "Merge multiple Mattermost users into a single user"
-LABEL org.opencontainers.image.authors = "Maxwell Power"
-LABEL org.opencontainers.image.source = "https://github.com/maxwellpower/mm-merge"
+LABEL org.opencontainers.image.title="mm-merge"
+LABEL org.opencontainers.image.description="Merge multiple Mattermost users into a single user"
+LABEL org.opencontainers.image.authors="Maxwell Power"
+LABEL org.opencontainers.image.source="https://github.com/maxwellpower/mm-merge"
+LABEL org.opencontainers.image.licenses=MIT
 
 RUN apt-get update && apt-get install -y \
     libpq-dev && docker-php-ext-install pdo pdo_pgsql \
