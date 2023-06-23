@@ -96,11 +96,23 @@ try {
                 // Perform the merge
                 echo "<div class='row'><div class='col'><h3 class='text-success'>Starting merge ...</h3></div></div>";
                 $mergeUsers = mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun, $debug);
-                echo "</div></div><div class='row'><div class='col'>";
-                if (!$mergeUsers) {
+                echo "<div class='row'><div class='col'>";
+
+                // Check if error array is empty
+                if (empty($mergeUsers)) {
                     echo "<div class='alert alert-success text-center'><strong><i class='bi bi-check-circle-fill'></i> User merge completed successfully!</strong></div>";
                 } else {
+                    // Output all failures
                     echo "<div class='alert alert-danger text-center'><strong><i class='bi bi-exclamation-circle-fill'></i> User merge completed with errors!</strong></div>";
+                    echo "<div class='row'><div class='col'><h3 class='text-danger'>Error Summary</h3><div class='row alert alert-secondary'><div class='col'>";
+                    foreach ($mergeUsers as $error) {
+                        $id = $error['errorRowID'];
+                        $table = $error['errorReportedTable'];
+                        $message = $error['errorReportedMessage'];
+
+                        echo "<p><strong>Query</strong>: <a href='#$id'>" . $table . "</a></><br><strong>Message</strong>: <code>" . $message . "</code></p>";
+                    }
+                    echo "</div></div>";
                 }
                 echo "</div></div>";
                 ?>
@@ -111,7 +123,7 @@ try {
 <div class="row">
     <div class="col">
         <?php
-        if ($dryRun) {
+        if ($dryRun && empty($mergeUsers)) {
             // Generate a new hidden form and submit button that will actually complete the merge
             ?>
             <form id="users" method="post">
@@ -136,12 +148,20 @@ try {
                         <strong><i class="bi bi-sign-merge-left-fill"></i> COMPLETE ACCOUNT MERGE</strong></button>
                 </div>
             </form>
-        <?php } else {
+        <?php } elseif (empty($mergeUsers)) {
             ?>
             <div class="text-center mt-3">
                 <button title="new" id="new" type="button" class="btn btn-lg btn-success"
                         onclick="window.location.href='/'"><strong><i class="bi bi-plus-circle-fill"></i> New
                         Merge</strong></button>
+            </div>
+            <?php
+        } elseif ($dryRun) {
+            ?>
+            <div class="text-center mt-3">
+                <button title="refresh" id="refresh" type="button" class="btn btn-lg btn-primary"
+                        onclick="window.location.reload();"><strong><i class="bi bi-arrow-clockwise"></i> Try
+                        Again</strong></button>
             </div>
             <?php
         } ?>

@@ -14,16 +14,45 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 // Function to merge two users
-function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun, $debug): bool
+function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun, $debug): array
 {
+    global $errorArray;
+    $errorArray = [];
+
     // Function to update the specified table with the new user ID
     function updateTable($table, $userIdColumn, $oldUserId, $newUserId, $dryRun, $debug): void
     {
         $query = "UPDATE $table SET $userIdColumn = '$newUserId' WHERE $userIdColumn = '$oldUserId'";
-        executeQuery($query, $dryRun, $debug);
+        processQuery("query_$table", "Updating Table $table", $query, $dryRun, $debug);
     }
 
-    $errorReported = false;
+    function handleDatabaseQueryFailure($table, $e, $id): void
+    {
+        global $errorArray;
+
+        $errorReportedTable = $table;
+        $errorReportedMessage = $e->getMessage();
+
+        $errorArray[] = [
+            'errorReportedTable' => $errorReportedTable,
+            'errorReportedMessage' => $errorReportedMessage,
+            'errorRowID' => $id
+        ];
+    }
+
+    function processQuery($id, $heading, $query, $dryRun, $debug): void
+    {
+        echo "<div id='$id' class='row mb-1'><div class='col alert alert-secondary'>";
+        echo "<h4>$heading ...</h4>";
+        try {
+            executeQuery($query, $dryRun, $debug);
+        } catch (Exception $e) {
+            echo "Error $heading: <code>" . $e->getMessage() . "</code><br><br>";
+            handleDatabaseQueryFailure($query, $e, $id);
+            executeRollbackChanges();
+        }
+        echo "</div></div>";
+    }
 
     // List of tables that contain the user ID
     $tables = [
@@ -63,65 +92,39 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
 
     // Update each table with the new user ID
     foreach ($tables as $table => $userIdColumn) {
-        echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-        echo "<h4>Updating $table...</h4>";
-        try {
-            updateTable($table, $userIdColumn, $oldUserId, $newUserId, $dryRun, $debug);
-        } catch (Exception $e) {
-            echo "Error updating $table: <code>" . $e->getMessage() . "</code><br><br>";
-            $errorReported = true;
-        }
-        echo '</div></div>';
+        updateTable($table, $userIdColumn, $oldUserId, $newUserId, $dryRun, $debug);
     }
 
     // Update channelmembers table with the new user ID where the newuserID is not already listed as a member
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Updating channelmembers...</h4>";
     $query = "UPDATE channelmembers SET userid = '$newUserId' WHERE userid = '$oldUserId' AND channelid NOT IN (SELECT channelid FROM channelmembers WHERE userid = '$newUserId') AND channelid IN (SELECT id FROM channels WHERE type = 'O' or type = 'G')";
+    processQuery('query_channelmembers', "Updating Channel Members", $query, $dryRun, $debug);
     try {
         executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating channelmembers: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
+        handleDatabaseQueryFailure($table, $e);
+        executeRollbackChanges();
     }
     echo "</div></div>";
 
     // Update the productnoticeviewstate table with the new user ID
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Updating productnoticeviewstate ...</h4>";
     $query = "DELETE from productnoticeviewstate WHERE userid = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating productnoticeviewstate: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_productnoticeviewstate', "Removing Product Notice View State", $query, $dryRun, $debug);
 
     // Update DM Posts
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Updating DM Posts ...</h4>";
     $olddmchannelname = $oldUserId . '__' . $oldUserId;
     $query = "SELECT id FROM channels WHERE name = '$olddmchannelname' AND type = 'D'";
-    try {
-        $results = executeSELECTQuery($query);
-        @$olddmchannelid = $results[0]['id'];
-    } catch (Exception $e) {
-        echo "Could not select old channel name: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
+    $results = executeSELECTQuery($query);
+    @$olddmchannelid = $results[0]['id'];
 
     $newdmchannelname = $newUserId . '__' . $newUserId;
     $query = "SELECT id FROM channels WHERE name = '$newdmchannelname' AND type = 'D'";
-    try {
-        $results = executeSELECTQuery($query);
-        $newdmchannelid = $results[0]['id'];
-    } catch (Exception $e) {
-        echo "Could not select new channel name: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
+    $results = executeSELECTQuery($query);
+    $newdmchannelid = $results[0]['id'];
 
     if (empty($olddmchannelid) || empty($newdmchannelid)) {
+        echo '<div id="query_update_dm_posts" class="row mb-1"><div class="col alert alert-secondary">';
+        echo '<h4>Updating DM Posts ...</h4>';
         if (empty($olddmchannelid)) {
             echo "<code>Could not find old DM channel ID</code><br><br>";
         } elseif (empty($newdmchannelid)) {
@@ -129,212 +132,81 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
         } else {
             echo "<code>Could not find old or new DM channel ID</code><br><br>";
         }
-        $errorReported = true;
+        echo "</div></div>";
     } else {
         $query = "UPDATE posts SET channelid = '$newdmchannelid' WHERE channelid = '$olddmchannelid'";
-        try {
-            executeQuery($query, $dryRun, $debug);
-        } catch (Exception $e) {
-            echo "Error updating DM posts: <code>" . $e->getMessage() . "</code><br><br>";
-            $errorReported = true;
-        }
+        processQuery('query_update_dm_posts', "Updating DM Posts", $query, $dryRun, $debug);
     }
-    echo "</div></div>";
 
     // Remove users DM channel
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Removing users DM channel ...</h4>";
     $query = "DELETE FROM channels WHERE name = '$olddmchannelname' AND type = 'D'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error deleting DM channel: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_remove_old_dm', "Removing Users DM Channel", $query, $dryRun, $debug);
 
     // Update DM Channels
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Updating DM Channels ...</h4>";
     $query = "UPDATE channels SET name = REPLACE(name, '$oldUserId', '$newUserId') WHERE type = 'D' AND name != '$newdmchannelname' AND NOT EXISTS (SELECT 1 FROM channels WHERE name = '$newdmchannelname')";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating DM channels: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_update_dm', "Updating DM Channels", $query, $dryRun, $debug);
 
     // Remove DM between old and new user
     $sharedmchannelname1 = $oldUserId . '__' . $newUserId;
     $sharedmchannelname2 = $newUserId . '__' . $oldUserId;
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Removing DM between old and new user ...</h4>";
     $query = "DELETE FROM channels WHERE name = '$sharedmchannelname1' OR name = '$sharedmchannelname2' AND type = 'D'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error deleting DM channel: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_old_new_dm', "Removing DM Between Merged Users", $query, $dryRun, $debug);
 
     // Update channel creator
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Updating channel creator ...</h4>";
     $query = "UPDATE channels SET creatorid = '$newUserId' WHERE creatorid = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating channel creator: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_channel_creator', "Updating Channel Creator", $query, $dryRun, $debug);
 
     // Update focalboard_blocks modified_by
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Updating focalboard_blocks ...</h4>";
     $query = "UPDATE focalboard_blocks SET modified_by = '$newUserId' WHERE modified_by = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating focalboard_blocks: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_board_blocks', "Updating Board Blocks", $query, $dryRun, $debug);
 
     // Update focalboard_blocks modified_by
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Updating focalboard_blocks_history ...</h4>";
     $query = "UPDATE focalboard_blocks_history SET modified_by = '$newUserId' WHERE modified_by = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating focalboard_blocks: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_board_blocks_history', "Updating Board Blocks History", $query, $dryRun, $debug);
 
     // Update boards history
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Updating boards history ...</h4>";
     $query = "UPDATE focalboard_boards_history SET modified_by = '$newUserId' WHERE modified_by = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating focalboard_boards_history: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_board_history', "Updating Board History", $query, $dryRun, $debug);
 
     // Delete the old users focalboard preferences
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Deleting focalboard preferences ...</h4>";
     $query = "DELETE FROM focalboard_preferences WHERE userid = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating focalboard_preferences: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_board_preferences', "Removing Board Preferences", $query, $dryRun, $debug);
 
     // Delete board sessions
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Deleting board sessions ...</h4>";
     $query = "DELETE FROM focalboard_sessions WHERE user_id = '$oldUserId' OR user_id = '$newUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating focalboard_sessions: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_board_sessions', "Removing Board Sessions", $query, $dryRun, $debug);
 
     // Delete the old users board account
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Deleting focalboard account ...</h4>";
     $query = "DELETE FROM focalboard_users WHERE id = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating focalboard_users: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_board_account', "Removing Board Account", $query, $dryRun, $debug);
 
     // Replace the olduserID in groupmembers with the newuserID where the newuserID is not already listed in the same groupid
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Replacing groupmembers ...</h4>";
     $query = "UPDATE groupmembers SET userid = '$newUserId' WHERE userid = '$oldUserId' AND groupid NOT IN (SELECT groupid FROM groupmembers WHERE userid = '$newUserId')";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating groupmembers: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_groupmembers', "Updating Group Members", $query, $dryRun, $debug);
 
     // Update ir_incident with new commander
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Updating ir_incident commander ...</h4>";
     $query = "UPDATE ir_incident SET commanderuserid = '$newUserId' WHERE commanderuserid = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating ir_incident commander: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_ir_incident_commander', "Updating Playbook Incident Commander", $query, $dryRun, $debug);
 
     // Update ir_incident checklistsjson with the new user ID
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Updating ir_incident checklistsjson ...</h4>";
     $query = "UPDATE ir_incident SET checklistsjson = (checklistsjson::text)::jsonb - '$oldUserId' || '\"$newUserId\"' WHERE checklistsjson::text LIKE '%$oldUserId%'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating ir_incident checklistsjson: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_ir_incident_checklist', "Updating Playbook Incident Checklists", $query, $dryRun, $debug);
 
     // Update ir_timelineevent subjectuserid
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Updating ir_timelineevent subjectuserid ...</h4>";
     $query = "UPDATE ir_timelineevent SET subjectuserid = '$newUserId' WHERE subjectuserid = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating ir_timelineevent: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_ir_timelineevent', "Updating Playbook Timeline Events", $query, $dryRun, $debug);
 
     // Delete the old users oauth data
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Deleting oauth data ...</h4>";
     $query = "DELETE FROM oauthaccessdata WHERE userid = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating oauthaccessdata: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
+    processQuery('query_oauthaccessdata', "Removing Oauth Access Data", $query, $dryRun, $debug);
     $query = "DELETE FROM oauthauthdata WHERE userid = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating oauthauthdata: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_oauthauthdata', "Removing Oauth Auth Data", $query, $dryRun, $debug);
 
     // Update the system posts props json with the proper username of the new user
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Updating system posts props json ...</h4>";
 
     if (empty($oldUsername) || empty($newUsername)) {
+        echo '<div id="query_posts_props_username" class="row mb-1"><div class="col alert alert-secondary">';
+        echo '<h4>Updating System Posts Props JSON ...</h4>';
         if (empty($oldUsername)) {
             echo "<code>Could not find old username</code><br><br>";
         } elseif (empty($newUsername)) {
@@ -342,157 +214,63 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
         } else {
             echo "<code>Could not find old or new username</code><br><br>";
         }
-        $errorReported = true;
+        echo "</div></div>";
     } else {
         $query = "UPDATE posts SET props = props - '$oldUsername' || '{\"$newUsername\": true}' WHERE props::text LIKE '%$oldUsername%'";
-        try {
-            executeQuery($query, $dryRun, $debug);
-        } catch (Exception $e) {
-            echo "Error updating system posts props: <code>" . $e->getMessage() . "</code><br><br>";
-            $errorReported = true;
-        }
+        processQuery('query_posts_props_username', "Updating System Posts Props JSON", $query, $dryRun, $debug);
     }
-    echo "</div></div>";
 
     // Update the post props json
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Updating post props json ...</h4>";
     $query = "UPDATE posts SET props = jsonb_set(props, '{userId}', '\"$newUserId\"') WHERE props->>'userId' = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating posts props: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_posts_props_userid', "Updating Post Props JSON", $query, $dryRun, $debug);
 
     // Delete the old users preferences
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Deleting preferences ...</h4>";
     $query = "DELETE FROM preferences WHERE userid = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating preferences: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_preferences', "Removing Preferences", $query, $dryRun, $debug);
 
     // Delete the old and new users sessions
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Removing sessions ...</h4>";
     $query = "DELETE FROM sessions WHERE userid = '$oldUserId' OR userid = '$newUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating sessions: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_sessions', "Removing Sessions", $query, $dryRun, $debug);
 
     // Remove sidebar categories
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Removing old sidebar categories ...</h4>";
     $query = "DELETE FROM sidebarcategories WHERE userid = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating sidebarcategories: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_sidebarcategories', "Removing Sidebar Categories", $query, $dryRun, $debug);
 
     // Remove status
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Removing old status ...</h4>";
     $query = "DELETE FROM status WHERE userid = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating status: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_status', "Removing Old Status", $query, $dryRun, $debug);
 
     // Remove team member
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Removing old team member ...</h4>";
     $query = "DELETE FROM teammembers WHERE userid = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating teammembers: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery('query_remove_teammember', "Removing Old Team Member", $query, $dryRun, $debug);
 
     // Reset authdata if requested
     if ($_POST['force_authdata_checkbox']) {
-        echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-        echo "<h4>Resetting authdata ...</h4>";
         $query = "UPDATE users SET authdata = NULL WHERE id = '$newUserId'";
-        try {
-            executeQuery($query, $dryRun, $debug);
-        } catch (Exception $e) {
-            echo "Error updating authdata: <code>" . $e->getMessage() . "</code><br><br>";
-            $errorReported = true;
-        }
-        echo "</div></div>";
+        processQuery('query_update_authdata', "Resetting authdata", $query, $dryRun, $debug);
     }
 
     // Update the email address if requested
     if (isset($_POST['force_email_checkbox']) && $_POST['force_email_checkbox']) {
         $force_email = $_POST['force_email'];
-        echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-        echo "<h4>Updating email address to <code>$force_email</code> ...</h4>";
         $query = "UPDATE users SET email = '$force_email' WHERE id = '$newUserId'";
-        try {
-            executeQuery($query, $dryRun, $debug);
-        } catch (Exception $e) {
-            echo "Error updating email: <code>" . $e->getMessage() . "</code><br><br>";
-            $errorReported = true;
-        }
-        echo "</div></div>";
+        processQuery('query_update_email', "Updating email to <code>$force_email</code>", $query, $dryRun, $debug);
     }
 
     // Update the username if requested
-    if (isset($_POST['force_email_checkbox']) && $_POST['force_username_checkbox']) {
+    if (isset($_POST['force_username_checkbox']) && $_POST['force_username_checkbox']) {
         $force_username = $_POST['force_username'];
-        echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-        echo "<h4>Updating username to <code>$force_username</code> ...</h4>";
         $query = "UPDATE users SET username = '$force_username' WHERE id = '$newUserId'";
-        try {
-            executeQuery($query, $dryRun, $debug);
-        } catch (Exception $e) {
-            echo "Error updating username: <code>" . $e->getMessage() . "</code><br><br>";
-            $errorReported = true;
-        }
-        echo "</div></div>";
+        processQuery("query_update_username", "Updating Username to <code>$force_username</code>", $query, $dryRun, $debug);
     }
 
     // Ensure the user account is enabled and has no deleted date set
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Enabling account ...</h4>";
     $query = "UPDATE users SET deleteat = 0 WHERE id = '$newUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error deleting user: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery("query_enable_account", "Enabling Account", $query, $dryRun, $debug);
 
     // Delete the old users account
-    echo '<div class="row mb-1"><div class="col alert alert-secondary">';
-    echo "<h4>Deleting old account ...</h4>";
     $query = "DELETE FROM users WHERE id = '$oldUserId'";
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating users: <code>" . $e->getMessage() . "</code><br><br>";
-        $errorReported = true;
-    }
-    echo "</div></div>";
+    processQuery("query_delete_old_account", "Removing Old Account", $query, $dryRun, $debug);
 
-    return $errorReported;
+    return $errorArray;
 }

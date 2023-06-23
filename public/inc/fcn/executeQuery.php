@@ -58,3 +58,9 @@ function executeSELECTQuery($query): false|array
     $stmt->execute();
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
+function executeRollbackChanges(): void
+{
+    global $pdo;
+    $pdo->rollBack();
+}
