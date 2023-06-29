@@ -244,6 +244,10 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     $query = "DELETE FROM teammembers WHERE userid = '$oldUserId'";
     processQuery('query_remove_teammember', "Removing Old Team Member", $query, $dryRun, $debug);
 
+    // Delete the old users account
+    $query = "DELETE FROM users WHERE id = '$oldUserId'";
+    processQuery("query_delete_old_account", "Removing Old Account", $query, $dryRun, $debug);
+
     // Reset authdata if requested
     if ($_POST['force_authdata_checkbox']) {
         $query = "UPDATE users SET authdata = NULL WHERE id = '$newUserId'";
@@ -267,10 +271,6 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     // Ensure the user account is enabled and has no deleted date set
     $query = "UPDATE users SET deleteat = 0 WHERE id = '$newUserId'";
     processQuery("query_enable_account", "Enabling Account", $query, $dryRun, $debug);
-
-    // Delete the old users account
-    $query = "DELETE FROM users WHERE id = '$oldUserId'";
-    processQuery("query_delete_old_account", "Removing Old Account", $query, $dryRun, $debug);
 
     return $errorArray;
 }
