@@ -2,7 +2,10 @@
 
 A simple web application designed to merge two Mattermost users into one.
 
-## Notice
+**Currently, this tool only supports Mattermost installs using a Postgres Databases. MySQL support is planned for a
+future release.**
+
+## Important Notice
 
 This script is provided as-is with no warranty or guarantee. Please test this script in a non-production environment
 before using it in production. This script is not directly supported by Mattermost and was created for use by the

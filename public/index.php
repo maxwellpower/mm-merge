@@ -12,11 +12,11 @@
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
 # AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-require 'inc/header.php';
-require_once 'inc/db.php';
 
+require_once 'inc/loader.php';
+require 'inc/header.php';
 /**
- * @var string $safeMode
+ * @var bool $safeMode
  */
 ?>
     <div class="row">
@@ -35,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 } // Display the form
 else {
+    syslog(LOG_INFO, "User Merge Tool loaded");
     ?>
     <div class="row">
         <div class="col text-center">
@@ -48,7 +49,9 @@ else {
         </div>
     </div>
     <?php
-    if ($safeMode) { ?>
+    if ($safeMode) {
+        syslog(LOG_WARNING, "Safe Mode enabled")
+        ?>
         <div class="row">
             <div class="col-6 offset-3 text-center">
                 <div class="row">
@@ -61,19 +64,6 @@ else {
         </div>
     <?php }
     require 'inc/form.inc.php';
-    if (getenv('DUMP_POST') !== null && getenv('DUMP_POST')) {
-        ?>
-        <div class="row mt-3">
-            <div class="col-4 offset-4 text-center">
-                <div class="row">
-                    <div class="col alert alert-warning">
-                        <h4 class="mt-2"><i class="bi bi-bug-fill"></i> POST DEBUG: <code>ENABLED</code></h4>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <?php
-    }
 }
 
 require 'inc/footer.php';

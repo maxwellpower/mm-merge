@@ -13,25 +13,12 @@
 # AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-if (getenv('DUMP_POST') !== null && getenv('DUMP_POST')) {
-    ini_set('display_errors', 1);
-    ?>
-    <div class="row mb-3">
-        <div class="col-8 offset-2 alert alert-warning">
-            <h2 class="text-center"><i class="bi bi-mailbox2"></i> Post Data</h2>
-            <div class='row alert bg-dark border border-dark border-3 rounded mb-3 mt-3'>
-                <div class='col'>
-                    <pre class='mt-2 text-light overflow-auto'>
-<?php print_r(json_encode($_POST, JSON_PRETTY_PRINT)); ?>
-                    </pre>
-                </div>
-            </div>
-        </div>
-    </div>
-    <?php
-} else {
-    ini_set('display_errors', 0);
-}
+/**
+ * @var string $PG_host
+ * @var string $PG_port
+ * @var string $PG_user
+ */
+
 // Get the selected users to merge
 $oldUserId = $_POST['old_user_id'];
 $newUserId = $_POST['new_user_id'];
@@ -70,6 +57,8 @@ try {
     error_log("Error getting old username " . $e->getMessage());
     $oldUsername = "Unknown";
 }
+
+syslog(LOG_INFO, "Merging user $oldUsername ($oldUserId) into $newUsername ($newUserId)");
 ?>
 <div class="row">
     <div class="col-8 offset-2">

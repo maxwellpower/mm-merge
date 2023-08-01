@@ -49,6 +49,7 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
         } catch (Exception $e) {
             echo "Error $heading: <code>" . $e->getMessage() . "</code><br><br>";
             handleDatabaseQueryFailure($query, $e, $id);
+            syslog(LOG_ERR, "Error $heading: " . $e->getMessage());
             executeRollbackChanges();
         }
         echo "</div></div>";
@@ -103,7 +104,7 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
         executeQuery($query, $dryRun, $debug);
     } catch (Exception $e) {
         echo "Error updating channelmembers: <code>" . $e->getMessage() . "</code><br><br>";
-        handleDatabaseQueryFailure($table, $e);
+        handleDatabaseQueryFailure($table, $e, 'query_channelmembers');
         executeRollbackChanges();
     }
     echo "</div></div>";
@@ -259,22 +260,24 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     if (isset($_POST['force_email_checkbox']) && $_POST['force_email_checkbox']) {
         $force_email = $_POST['force_email'];
         if ($dryRun) {
-            $query = "DELETE FROM users WHERE id = '$oldUserId'";
+            $query = "DELETE FROM users WHERE id = '$oldUserId'; UPDATE users SET email = '$force_email' WHERE id = '$newUserId'";
             processQuery("query_delete_old_account", "Removing Old Account", $query, $dryRun, $debug);
+        } else {
+            $query = "UPDATE users SET email = '$force_email' WHERE id = '$newUserId'";
+            processQuery('query_update_email', "Updating email to <code>$force_email</code>", $query, $dryRun, $debug);
         }
-        $query = "UPDATE users SET email = '$force_email' WHERE id = '$newUserId'";
-        processQuery('query_update_email', "Updating email to <code>$force_email</code>", $query, $dryRun, $debug);
     }
 
     // Update the username if requested
     if (isset($_POST['force_username_checkbox']) && $_POST['force_username_checkbox']) {
         $force_username = $_POST['force_username'];
         if ($dryRun) {
-            $query = "DELETE FROM users WHERE id = '$oldUserId'";
+            $query = "DELETE FROM users WHERE id = '$oldUserId'; UPDATE users SET username = '$force_username' WHERE id = '$newUserId'";
             processQuery("query_delete_old_account", "Removing Old Account", $query, $dryRun, $debug);
+        } else {
+            $query = "UPDATE users SET username = '$force_username' WHERE id = '$newUserId'";
+            processQuery("query_update_username", "Updating Username to <code>$force_username</code>", $query, $dryRun, $debug);
         }
-        $query = "UPDATE users SET username = '$force_username' WHERE id = '$newUserId'";
-        processQuery("query_update_username", "Updating Username to <code>$force_username</code>", $query, $dryRun, $debug);
     }
 
     // Ensure the user account is enabled and has no deleted date set

@@ -17,12 +17,19 @@
  * @var string $PG_host
  * @var string $PG_port
  * @var string $PG_user
+ * @var bool $users_DEBUG
  */
 
 // Fetch existing user accounts available to merge
 $query = "SELECT id, firstname, lastname, username, email FROM users WHERE email NOT LIKE '%@localhost' AND username
     NOT LIKE 'admin' ORDER BY lastname";
 $users = executeSELECTQuery($query);
+
+if ($users_DEBUG) {
+    $users_DEBUG = json_encode($users, JSON_PRETTY_PRINT);
+    syslog(LOG_INFO, "Found the following users to merge from $PG_host:$PG_port");
+    syslog(LOG_INFO, $users_DEBUG);
+}
 ?>
 <div class="row">
     <div class="col-6 offset-3">

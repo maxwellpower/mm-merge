@@ -20,7 +20,9 @@ $PG_dbname = getenv('PG_DATABASE');
 $PG_user = getenv('PG_USER');
 $PG_password = getenv('PG_PASSWORD');
 
+// Other configuration
 $safeMode = getenv('SAFE_MODE') ?: false;
+$debugUsers = getenv('DEBUG_USERS') ?: false;
 
 // Create a PDO connection to the PostgreSQL database
 try {
@@ -28,4 +30,9 @@ try {
     $pdo = new PDO($dsn);
 } catch (PDOException $e) {
     die("Connection failed: " . $e->getMessage());
+}
+
+// Start Logging
+if (!isset($openlog)) {
+    $openLog = openlog("mm-merge", LOG_ODELAY, LOG_LOCAL0);
 }
