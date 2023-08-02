@@ -21,10 +21,20 @@ LABEL org.opencontainers.image.authors="Maxwell Power"
 LABEL org.opencontainers.image.source="https://github.com/maxwellpower/mm-merge"
 LABEL org.opencontainers.image.licenses=MIT
 
-RUN apt-get update && apt-get install -y \
-    libpq-dev && docker-php-ext-install pdo pdo_pgsql \
+RUN apt-get update -qq && apt-get install -yqq --no-install-recommends \
+    libpq-dev \
+    rsyslog \
+    mariadb-client  \
+    && docker-php-ext-install pdo pdo_pgsql mysqli \
+    && docker-php-ext-enable pdo pdo_pgsql mysqli \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/* \
+    && sed -i '/imklog/s/^/#/' /etc/rsyslog.conf \
+    && ln -sf /proc/1/fd/1 /var/log/syslog \
+    && rm /var/log/apache2/error.log && touch /var/log/apache2/error.log \
+    && rm /var/log/apache2/access.log && touch /var/log/apache2/access.log
 
 COPY public/ /var/www/html
 
