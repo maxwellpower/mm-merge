@@ -40,74 +40,99 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
         ];
     }
 
-    function processQuery($id, $heading, $query, $dryRun, $debug): void
+    function processQuery($id, $heading, $query, $dryRun, $debug): false|array|null
     {
         echo "<div id='$id' class='row mb-1'><div class='col alert alert-secondary'>";
         echo "<h4>$heading ...</h4>";
         try {
-            executeQuery($query, $dryRun, $debug);
+            return executeQuery($query, $dryRun, $debug);
         } catch (Exception $e) {
             echo "Error $heading: <code>" . $e->getMessage() . "</code><br><br>";
             handleDatabaseQueryFailure($query, $e, $id);
-            syslog(LOG_ERR, "Error $heading: " . $e->getMessage());
+            syslog(LOG_ERR, "Merge Error in $heading: " . $e->getMessage());
             executeRollbackChanges();
+            return null;
+        } finally {
+            echo "</div></div>";
         }
-        echo "</div></div>";
     }
 
-    // List of tables that contain the user ID
-    $tables = [
-        'audits' => 'userid',
-        'channelmemberhistory' => 'userid',
-        'commandwebhooks' => 'userid',
-        'drafts' => 'userid',
-        'emoji' => 'creatorid',
-        'fileinfo' => 'creatorid',
-        'focalboard_blocks' => 'created_by',
-        'focalboard_blocks_history' => 'created_by',
-        'focalboard_board_members' => 'user_id',
-        'focalboard_board_members_history' => 'user_id',
-        'focalboard_boards_history' => 'created_by',
-        'focalboard_subscriptions' => 'subscriber_id',
-        'incomingwebhooks' => 'userid',
-        'ir_category' => 'userid',
-        'ir_incident' => 'reporteruserid',
-        'ir_playbookautofollow' => 'userid',
-        'ir_playbookmember' => 'memberid',
-        'ir_run_participants' => 'userid',
-        'ir_timelineevent' => 'creatoruserid',
-        'ir_viewedchannel' => 'userid',
-        'notifyadmin' => 'userid',
-        'outgoingwebhooks' => 'creatorid',
-        'postacknowledgements' => 'userid',
-        'postreminders' => 'userid',
-        'posts' => 'userid',
-        'reactions' => 'userid',
-        'recentsearches' => 'userid',
-        'sharedchannels' => 'creatorid',
-        'sharedchannelusers' => 'userid',
-        'termsofservice' => 'userid',
-        'threadmemberships' => 'userid',
-        'uploadsessions' => 'userid',
-        'useraccesstokens' => 'userid'
-    ];
+    function handleUserUpdate($field, $forceValue, $checkboxName, $queryId, $oldUserId, $newUserId, $dryRun, $debug): void
+    {
+        if (isset($_POST[$checkboxName]) && $_POST[$checkboxName]) {
+            $id = $queryId;
+            $heading = "Updating $field to <code>$forceValue</code>";
 
-    // Update each table with the new user ID
-    foreach ($tables as $table => $userIdColumn) {
-        updateTable($table, $userIdColumn, $oldUserId, $newUserId, $dryRun, $debug);
+            if ($dryRun) {
+                echo "<div id='$id' class='row mb-1'><div class='col alert alert-secondary'>";
+                echo "<h4>$heading ...</h4>";
+
+                $checkQuery = "SELECT id FROM users WHERE $field = '$forceValue'";
+                $existingUser = executeSELECTQuery($checkQuery);
+
+                if ($existingUser && $existingUser[0]['id'] != $oldUserId) {
+                    echo "Error: $field $forceValue is already associated with another user.";
+                } else {
+                    echo "Dry run: Old user would be deleted and new user's $field would be updated to $forceValue.";
+                }
+
+                echo "</div></div>";
+            } else {
+                $query = "UPDATE users SET $field = '$forceValue' WHERE id = '$newUserId'";
+                processQuery($id, $heading, $query, $dryRun, $debug);
+            }
+        }
     }
+
+    function massUpdateTables($oldUserId, $newUserId, $dryRun, $debug): void
+    {
+        // List of tables that contain the user ID
+        $tables = [
+            'audits' => 'userid',
+            'channelmemberhistory' => 'userid',
+            'commandwebhooks' => 'userid',
+            'drafts' => 'userid',
+            'emoji' => 'creatorid',
+            'fileinfo' => 'creatorid',
+            'focalboard_blocks' => 'created_by',
+            'focalboard_blocks_history' => 'created_by',
+            'focalboard_board_members' => 'user_id',
+            'focalboard_board_members_history' => 'user_id',
+            'focalboard_boards_history' => 'created_by',
+            'focalboard_subscriptions' => 'subscriber_id',
+            'incomingwebhooks' => 'userid',
+            'ir_category' => 'userid',
+            'ir_incident' => 'reporteruserid',
+            'ir_playbookautofollow' => 'userid',
+            'ir_playbookmember' => 'memberid',
+            'ir_run_participants' => 'userid',
+            'ir_timelineevent' => 'creatoruserid',
+            'ir_viewedchannel' => 'userid',
+            'notifyadmin' => 'userid',
+            'outgoingwebhooks' => 'creatorid',
+            'postacknowledgements' => 'userid',
+            'postreminders' => 'userid',
+            'posts' => 'userid',
+            'recentsearches' => 'userid',
+            'sharedchannels' => 'creatorid',
+            'sharedchannelusers' => 'userid',
+            'termsofservice' => 'userid',
+            'threadmemberships' => 'userid',
+            'uploadsessions' => 'userid',
+            'useraccesstokens' => 'userid'
+        ];
+
+        // Update each table with the new user ID
+        foreach ($tables as $table => $userIdColumn) {
+            updateTable($table, $userIdColumn, $oldUserId, $newUserId, $dryRun, $debug);
+        }
+    }
+
+    massUpdateTables($oldUserId, $newUserId, $dryRun, $debug);
 
     // Update channelmembers table with the new user ID where the newuserID is not already listed as a member
     $query = "UPDATE channelmembers SET userid = '$newUserId' WHERE userid = '$oldUserId' AND channelid NOT IN (SELECT channelid FROM channelmembers WHERE userid = '$newUserId') AND channelid IN (SELECT id FROM channels WHERE type = 'O' or type = 'G')";
     processQuery('query_channelmembers', "Updating Channel Members", $query, $dryRun, $debug);
-    try {
-        executeQuery($query, $dryRun, $debug);
-    } catch (Exception $e) {
-        echo "Error updating channelmembers: <code>" . $e->getMessage() . "</code><br><br>";
-        handleDatabaseQueryFailure($table, $e, 'query_channelmembers');
-        executeRollbackChanges();
-    }
-    echo "</div></div>";
 
     // Update the productnoticeviewstate table with the new user ID
     $query = "DELETE from productnoticeviewstate WHERE userid = '$oldUserId'";
@@ -122,7 +147,7 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     $newdmchannelname = $newUserId . '__' . $newUserId;
     $query = "SELECT id FROM channels WHERE name = '$newdmchannelname' AND type = 'D'";
     $results = executeSELECTQuery($query);
-    $newdmchannelid = $results[0]['id'];
+    @$newdmchannelid = $results[0]['id'];
 
     if (empty($olddmchannelid) || empty($newdmchannelid)) {
         echo '<div id="query_update_dm_posts" class="row mb-1"><div class="col alert alert-secondary">';
@@ -145,8 +170,14 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     processQuery('query_remove_old_dm', "Removing Users DM Channel", $query, $dryRun, $debug);
 
     // Update DM Channels
-    $query = "UPDATE channels SET name = REPLACE(name, '$oldUserId', '$newUserId') WHERE type = 'D' AND name != '$newdmchannelname' AND NOT EXISTS (SELECT 1 FROM channels WHERE name = '$newdmchannelname')";
-    processQuery('query_update_dm', "Updating DM Channels", $query, $dryRun, $debug);
+    $query = "SELECT id, REPLACE(name, '$oldUserId', '$newUserId') AS newName FROM channels WHERE type = 'D' AND name != '$newdmchannelname'";
+    $results = executeSELECTQuery($query);
+    foreach ($results as $result) {
+        $id = $result['id'];
+        $newName = $result['newName'];
+        $query = "UPDATE channels SET name = '$newName' WHERE id = '$id' AND NOT EXISTS (SELECT 1 FROM channels WHERE name = '$newName') AND NOT EXISTS (SELECT 1 FROM channels WHERE name = '$newdmchannelname')";
+        processQuery('query_update_channels', "Updating DM Channels", $query, $dryRun, $debug);
+    }
 
     // Remove DM between old and new user
     $sharedmchannelname1 = $oldUserId . '__' . $newUserId;
@@ -230,6 +261,30 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     $query = "DELETE FROM preferences WHERE userid = '$oldUserId'";
     processQuery('query_preferences', "Removing Preferences", $query, $dryRun, $debug);
 
+    // Handle special case for reactions table
+    if ($dryRun) {
+        // If it's a dry run, just display a message about what would be done
+        $conflictCheckQuery = "SELECT postid, emojiname FROM reactions WHERE userid = '$oldUserId' AND (postid, emojiname) IN (SELECT postid, emojiname FROM reactions WHERE userid = '$newUserId')";
+        $conflicts = executeSELECTQuery($conflictCheckQuery);
+
+        if (!empty($conflicts)) {
+            echo "<div id='conflict_reactions' class='row mb-1'><div class='col alert alert-secondary'>";
+            echo "<h4>Resolving Conflicts in reactions ...</h4>";
+            echo "Dry run: Conflicting reactions from the old user would be deleted.";
+            foreach ($conflicts as $conflict) {
+                echo "<br>Post ID: {$conflict['postid']}, Emoji: {$conflict['emojiname']}";
+            }
+            echo "</div></div>";
+        } else {
+            updateTable('reactions', 'userid', $oldUserId, $newUserId, $dryRun, $debug);
+        }
+    } else {
+        // If it's not a dry run, execute the DELETE and UPDATE queries
+        $query = "DELETE FROM reactions WHERE userid = '$oldUserId' AND (postid, emojiname) IN (SELECT postid, emojiname FROM reactions WHERE userid = '$newUserId')";
+        processQuery("conflict_reactions", "Resolving Conflicts in reactions", $query, $dryRun, $debug);
+        updateTable('reactions', 'userid', $oldUserId, $newUserId, $dryRun, $debug);
+    }
+
     // Delete the old and new users sessions
     $query = "DELETE FROM sessions WHERE userid = '$oldUserId' OR userid = '$newUserId'";
     processQuery('query_sessions', "Removing Sessions", $query, $dryRun, $debug);
@@ -256,33 +311,16 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
         processQuery('query_update_authdata', "Resetting authdata", $query, $dryRun, $debug);
     }
 
-    // Update the email address if requested
-    if (isset($_POST['force_email_checkbox']) && $_POST['force_email_checkbox']) {
-        $force_email = $_POST['force_email'];
-        if ($dryRun) {
-            $query = "DELETE FROM users WHERE id = '$oldUserId'; UPDATE users SET email = '$force_email' WHERE id = '$newUserId'";
-            processQuery("query_delete_old_account", "Removing Old Account", $query, $dryRun, $debug);
-        } else {
-            $query = "UPDATE users SET email = '$force_email' WHERE id = '$newUserId'";
-            processQuery('query_update_email', "Updating email to <code>$force_email</code>", $query, $dryRun, $debug);
-        }
-    }
+    // Reset email if requested
+    handleUserUpdate('email', $_POST['force_email'] ?? '', 'force_email_checkbox', 'query_update_email', $oldUserId, $newUserId, $dryRun, $debug);
 
-    // Update the username if requested
-    if (isset($_POST['force_username_checkbox']) && $_POST['force_username_checkbox']) {
-        $force_username = $_POST['force_username'];
-        if ($dryRun) {
-            $query = "DELETE FROM users WHERE id = '$oldUserId'; UPDATE users SET username = '$force_username' WHERE id = '$newUserId'";
-            processQuery("query_delete_old_account", "Removing Old Account", $query, $dryRun, $debug);
-        } else {
-            $query = "UPDATE users SET username = '$force_username' WHERE id = '$newUserId'";
-            processQuery("query_update_username", "Updating Username to <code>$force_username</code>", $query, $dryRun, $debug);
-        }
-    }
+    // Reset username if requested
+    handleUserUpdate('username', $_POST['force_username'] ?? '', 'force_username_checkbox', 'query_update_username', $oldUserId, $newUserId, $dryRun, $debug);
 
     // Ensure the user account is enabled and has no deleted date set
     $query = "UPDATE users SET deleteat = 0 WHERE id = '$newUserId'";
     processQuery("query_enable_account", "Enabling Account", $query, $dryRun, $debug);
 
     return $errorArray;
+
 }

@@ -14,9 +14,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /**
- * @var string $PG_host
- * @var string $PG_port
- * @var string $PG_user
+ * @var string $DB_HOST
+ * @var string $DB_PORT
+ * @var string $DB_USER
  */
 
 // Get the selected users to merge
@@ -41,7 +41,7 @@ try {
         $newUsername = "Unknown";
     }
 } catch (Exception $e) {
-    // log the error to the php error log
+    // logs the error to the php error logs
     error_log("Error getting new username " . $e->getMessage());
     $newUsername = "Unknown";
 }
@@ -53,7 +53,7 @@ try {
         $oldUsername = "Unknown";
     }
 } catch (Exception $e) {
-    // log the error to the php error log
+    // logs the error to the php error logs
     error_log("Error getting old username " . $e->getMessage());
     $oldUsername = "Unknown";
 }
@@ -66,7 +66,7 @@ syslog(LOG_INFO, "Merging user $oldUsername ($oldUserId) into $newUsername ($new
             <div class="col text-center">
                 <h2>Merging <code><?= $oldUsername; ?></code> into <code><?= $newUsername; ?></code></h2>
                 <p><strong><i class="bi bi-database-fill"></i> Connected to</strong><span
-                            class="text-success"> <?= $PG_user . '@' . $PG_host . ':' . $PG_port; ?></span></p>
+                            class="text-success"> <?= $DB_USER . '@' . $DB_HOST . ':' . $DB_PORT; ?></span></p>
             </div>
         </div>
         <div class="row alert alert-light">
@@ -89,8 +89,20 @@ syslog(LOG_INFO, "Merging user $oldUsername ($oldUserId) into $newUsername ($new
 
                 // Check if error array is empty
                 if (empty($mergeUsers)) {
+                    syslog(LOG_INFO, "User merge completed successfully!");
                     echo "<div class='alert alert-success text-center'><strong><i class='bi bi-check-circle-fill'></i> User merge completed successfully!</strong></div>";
                 } else {
+                    $debugMergeOutputCount = count($mergeUsers);
+                    $debugMergeOutput = json_encode($mergeUsers, JSON_PRETTY_PRINT);
+                    syslog(LOG_ERR, "Found $debugMergeOutputCount errors during merge. Exporting log to logs/merge.json");
+                    $mergeLog = fopen($_SERVER['DOCUMENT_ROOT'] . "/logs/merge.json", "w") or die("Unable to open file!");
+                    $mergeLogWrite = fwrite($mergeLog, $debugMergeOutput);
+                    $mergeLog = fclose($mergeLog);
+                    if ($mergeLogWrite) {
+                        syslog(LOG_INFO, "Successfully exported errors to logs/merge.json.");
+                    } else {
+                        syslog(LOG_INFO, "Failed to export users list.");
+                    }
                     // Output all failures
                     echo "<div class='alert alert-danger text-center'><strong><i class='bi bi-exclamation-circle-fill'></i> User merge completed with errors!</strong></div>";
                     echo "<div class='row'><div class='col'><h3 class='text-danger'>Error Summary</h3><div class='row alert alert-secondary'><div class='col'>";
@@ -102,6 +114,7 @@ syslog(LOG_INFO, "Merging user $oldUsername ($oldUserId) into $newUsername ($new
                         echo "<p><strong>Query</strong>: <a href='#$id'>" . $table . "</a></><br><strong>Message</strong>: <code>" . $message . "</code></p>";
                     }
                     echo "</div></div>";
+                    echo "<div class='row'><div class='col'><h3 class='text-danger'>Error Log</h3><p>Errors output to <a href='logs/merge.json'><code>logs/merge.json</code></a></p></div></div>";
                 }
                 echo "</div></div>";
                 ?>

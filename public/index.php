@@ -15,9 +15,6 @@
 
 require_once 'inc/loader.php';
 require 'inc/header.php';
-/**
- * @var bool $safeMode
- */
 ?>
     <div class="row">
         <div class="col text-center">
@@ -35,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 } // Display the form
 else {
-    syslog(LOG_INFO, "User Merge Tool loaded");
+    syslog(LOG_INFO, "User Merge Tool Loaded");
     ?>
     <div class="row">
         <div class="col text-center">
@@ -49,15 +46,14 @@ else {
         </div>
     </div>
     <?php
-    if ($safeMode) {
-        syslog(LOG_WARNING, "Safe Mode enabled")
+    if ($_SESSION['safe_mode']) {
         ?>
         <div class="row">
             <div class="col-6 offset-3 text-center">
                 <div class="row">
                     <div class="col alert alert-warning">
                         <h4 class="mt-3"><i class="bi bi-cone-striped"></i> SAFE MODE: <code>ENABLED</code></h4>
-                        <p>Changes will not be commited to the database!</p>
+                        <p>Changes will not be committed to the database!</p>
                     </div>
                 </div>
             </div>

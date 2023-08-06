@@ -13,23 +13,42 @@
 # AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+session_start();
+ob_start();
+ini_set('max_execution_time', -1);
+ini_set('max_input_time', -1);
+ini_set('memory_limit', -1);
+
 // Database configuration
-$PG_host = getenv('PG_HOST');
-$PG_port = getenv('PG_PORT') ?: 5432;
-$PG_dbname = getenv('PG_DATABASE');
-$PG_user = getenv('PG_USER');
-$PG_password = getenv('PG_PASSWORD');
+$DB_HOST = getenv('DB_HOST');
+$DB_PORT = getenv('DB_PORT') ?: 5432;
+$DB_NAME = getenv('DB_NAME');
+$DB_USER = getenv('DB_USER');
+$DB_PASSWORD = getenv('DB_PASSWORD');
 
 // Other configuration
-$safeMode = getenv('SAFE_MODE') ?: false;
-$debugUsers = getenv('DEBUG_USERS') ?: false;
+$safeMode = getenv('SAFE_MODE');
+if ($safeMode) {
+    syslog(LOG_INFO, "Safe mode enabled");
+    $_SESSION['safe_mode'] = true;
+}
+$debugUsers = getenv('DEBUG_USERS');
+if ($debugUsers) {
+    syslog(LOG_INFO, "Debug users enabled");
+    $_SESSION['debug_users'] = true;
+}
 
-// Create a PDO connection to the PostgreSQL database
-try {
-    $dsn = "pgsql:host=$PG_host;port=$PG_port;dbname=$PG_dbname;user=$PG_user;password=$PG_password";
-    $pdo = new PDO($dsn);
-} catch (PDOException $e) {
-    die("Connection failed: " . $e->getMessage());
+if (!isset($pdo)) {
+    syslog(LOG_INFO, "Connecting to PostgresSQL database");
+    // Create a PDO connection to the PostgresSQL database
+    try {
+        $dsn = "pgsql:host=$DB_HOST;port=$DB_PORT;dbname=$DB_NAME;user=$DB_USER;password=$DB_PASSWORD";
+        $pdo = new PDO($dsn);
+        syslog(LOG_INFO, "Connected to database");
+    } catch (PDOException $e) {
+        syslog(LOG_ERR, "Connection failed: " . $e->getMessage());
+        die("Connection failed: " . $e->getMessage());
+    }
 }
 
 // Start Logging

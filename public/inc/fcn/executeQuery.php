@@ -17,20 +17,27 @@
 function executeQuery($query, $dryRun = true, $debug = true): false|array
 {
     global $pdo;
-    global $safeMode;
 
     $pdo->beginTransaction();
-    $stmt = $pdo->prepare($query . " RETURNING *");
+    // Only add RETURNING * for INSERT or UPDATE statements
+    if (stripos($query, 'INSERT') === 0 || stripos($query, 'UPDATE') === 0) {
+        $query .= " RETURNING *";
+    }
+    $stmt = $pdo->prepare($query);
     $stmt->execute();
     if ($debug) {
+        syslog(LOG_DEBUG, "Running Query: $query");
         echo "<div class='row'><div class='col'><p><strong>QUERY</strong>: <code>$query</code></p><p><strong>RESULTS</strong>:</p>";
         echo "<div class='row bg-dark border border-dark border-3 rounded mb-3 mt-3'><div class='col'><pre class='mt-2 text-light overflow-auto'><code>";
-        print_r(json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_PRETTY_PRINT));
+        $queryResult = json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_PRETTY_PRINT);
+        syslog(LOG_DEBUG, "Query Results: $queryResult");
+        print_r($queryResult);
         echo "</code></pre></div></div>";
     }
-    if ($safeMode) {
+    if ($_SESSION['safe_mode']) {
         $pdo->rollBack();
         if ($debug) {
+            syslog(LOG_DEBUG, "This was a safe mode run! Changes were not committed.");
             echo "<p class='alert alert-warning'><strong>NOTE</strong>: This was a safe mode run! Changes were not committed.</p></div></div>";
         }
         return false;
@@ -38,17 +45,18 @@ function executeQuery($query, $dryRun = true, $debug = true): false|array
     if ($dryRun) {
         $pdo->rollBack();
         if ($debug) {
+            syslog(LOG_DEBUG, "This was a dry run! Changes were not committed.");
             echo "<p class='alert alert-success'><strong>NOTE</strong>: This was a dry run! Changes were not committed.</p></div></div>";
         }
         return false;
     } else {
         $pdo->commit();
         if ($debug) {
+            syslog(LOG_DEBUG, "Changes were committed!");
             echo "<p class='alert alert-success'><strong>NOTE</strong>: Changes were committed!</p></div></div>";
         }
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
-
 }
 
 function executeSELECTQuery($query): false|array

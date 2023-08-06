@@ -14,10 +14,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /**
- * @var string $PG_host
- * @var string $PG_port
- * @var string $PG_user
- * @var bool $users_DEBUG
+ * @var string $DB_HOST
+ * @var string $DB_PORT
+ * @var string $DB_USER
  */
 
 // Fetch existing user accounts available to merge
@@ -25,10 +24,18 @@ $query = "SELECT id, firstname, lastname, username, email FROM users WHERE email
     NOT LIKE 'admin' ORDER BY lastname";
 $users = executeSELECTQuery($query);
 
-if ($users_DEBUG) {
-    $users_DEBUG = json_encode($users, JSON_PRETTY_PRINT);
-    syslog(LOG_INFO, "Found the following users to merge from $PG_host:$PG_port");
-    syslog(LOG_INFO, $users_DEBUG);
+if ($_SESSION['debug_users']) {
+    $debugUsersCount = count($users);
+    $debugUsersOutput = json_encode($users, JSON_PRETTY_PRINT);
+    syslog(LOG_INFO, "Found $debugUsersCount users on $DB_HOST. Exporting users list to logs/users.json");
+    $usersLog = fopen($_SERVER['DOCUMENT_ROOT'] . "/logs/users.json", "w") or die("Unable to open file!");
+    $usersLogWrite = fwrite($usersLog, $debugUsersOutput);
+    $usersLog = fclose($usersLog);
+    if ($usersLogWrite) {
+        syslog(LOG_INFO, "Successfully exported users list to logs/users.json.");
+    } else {
+        syslog(LOG_INFO, "Failed to export users list.");
+    }
 }
 ?>
 <div class="row">
@@ -37,7 +44,7 @@ if ($users_DEBUG) {
             <div class="col text-center">
                 <h2>Accounts to Merge</h2>
                 <p><strong><i class="bi bi-database-fill"></i> Connected to</strong><span
-                            class="text-success"> <?= $PG_user . '@' . $PG_host . ':' . $PG_port; ?></span></p>
+                            class="text-success"> <?= $DB_USER . '@' . $DB_HOST . ':' . $DB_PORT; ?></span></p>
             </div>
         </div>
         <div class=row">

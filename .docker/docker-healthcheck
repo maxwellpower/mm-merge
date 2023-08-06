@@ -14,34 +14,19 @@
 # AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-REPO_NAME="ghcr.io/maxwellpower/mm-merge"
-
-function _prepareEnvironment() {
-  echo "Preparing buildx Environment"
-  docker pull tonistiigi/binfmt
-  docker run --privileged --rm tonistiigi/binfmt --install linux/amd64,linux/arm/v7,linux/arm64
-  docker buildx create --use --driver docker-container --name binfmt --platform=linux/amd64,linux/arm/v7,linux/arm64
-  docker buildx inspect --bootstrap
+function _healthcheck_failed() {
+  echo "$1"
+  exit 1
 }
 
-function _buildContainer() {
-  echo "Build Container and pushing to GitHub" $REPO_NAME
-  docker buildx build \
-    --tag $REPO_NAME:latest \
-    --platform linux/amd64,linux/arm/v7,linux/arm64 \
-    --push \
-    .
+function _healthcheck() {
+  pgrep -x rsyslogd >/dev/null || _healthcheck_failed "SYSLOG HEALTHCHECK FAILED"
+  pgrep -x apache2 >/dev/null || _healthcheck_failed "APACHE2 HEALTHCHECK FAILED"
+  echo "$(date +'%b %d %H:%M:%S') ""${HOSTNAME}"" HEALTHCHECK[$$]: OK"
 }
 
-function _cleanupEnvironment() {
-  echo "Cleanup buildx Environment"
-  docker buildx rm binfmt
-  docker image rm tonistiigi/binfmt
-  echo "Cleanup Complete"
-}
-
-echo "Building Docker Image"
-_prepareEnvironment
-_buildContainer
-_cleanupEnvironment
-echo "DONE Building Docker Image"
+echo "Starting HEALTHCHECK ..."
+while true; do
+  _healthcheck
+  sleep 120
+done

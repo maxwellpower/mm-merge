@@ -21,21 +21,33 @@ LABEL org.opencontainers.image.authors="Maxwell Power"
 LABEL org.opencontainers.image.source="https://github.com/maxwellpower/mm-merge"
 LABEL org.opencontainers.image.licenses=MIT
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update -qq && apt-get install -yqq --no-install-recommends \
+    tzdata \
+    systemctl \
     libpq-dev \
     rsyslog \
-    mariadb-client  \
-    && docker-php-ext-install pdo pdo_pgsql mysqli \
-    && docker-php-ext-enable pdo pdo_pgsql mysqli \
+    && docker-php-ext-install pdo pdo_pgsql \
+    && docker-php-ext-enable pdo pdo_pgsql \
+    && apt-get autoremove --purge -yqq \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /tmp/* \
-    && rm -rf /var/tmp/* \
-    && sed -i '/imklog/s/^/#/' /etc/rsyslog.conf \
-    && ln -sf /proc/1/fd/1 /var/log/syslog \
-    && rm /var/log/apache2/error.log && touch /var/log/apache2/error.log \
-    && rm /var/log/apache2/access.log && touch /var/log/apache2/access.log
+    && rm -rf /var/tmp/*
 
 COPY public/ /var/www/html
-
 WORKDIR /var/www/html
+
+COPY .docker/* /usr/local/bin/
+
+RUN chmod +x /usr/local/bin/docker-* \
+&& docker-build \
+&& rm -rf /usr/local/bin/docker-build
+
+ENTRYPOINT ["docker-entrypoint"]
+CMD ["start"]
+
+EXPOSE 80 443
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 CMD pgrep -f docker-healthcheck || exit 1
