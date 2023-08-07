@@ -46,10 +46,44 @@ vi .env
 docker run -d --rm --name mm-merge -p 8080:80 -p 8443:443 --env-file=.env ghcr.io/maxwellpower/mm-merge
 ```
 
+### Command Line Only
+
+If you do not have access to a web browser, you can run the script from the command line. This is useful if you are
+running the script on a remote server.
+
+```bash
+curl -X POST localhost:8080 \
+     -d "old_user_id=[OLD_USER_ID]" \
+     -d "new_user_id=[NEW_USER_ID]" \
+     -d "force_authdata_checkbox=true" \
+     -d "force_username_checkbox=false" \
+     -d "force_username=[SPECIFIED_USERNAME]" \
+     -d "force_email_checkbox=false" \
+     -d "force_email=[SPECIFIED_EMAIL]" \
+     -d "dry_run_checkbox=true" \
+     -d "debug_checkbox=true"
+```
+
+**Replace**:
+
+- `localhost:8080` with the URL where the form submits its data.
+- `[OLD_USER_ID]` with the ID of the user account to purge.
+- `[NEW_USER_ID]` with the ID of the user account to remain.
+
+**Note**:
+
+The `force_username_checkbox` and `force_email_checkbox` are optional. If you want to force a username,
+set `force_username_checkbox` to `true` and `force_username` to the desired username. If you want to force an email
+address, set `force_email_checkbox` to `true` and `force_email` to the desired email address.
+
+The `dry_run_checkbox` and `debug_checkbox` are optional. If you want to run the script without making any
+changes, set `dry_run_checkbox` to `true`. If you want to see the raw SQL queries being run, set `debug_checkbox` to
+`true`.
+
 ## Output
 
-Detailed output is available in the browser while running the tool and in the console. To view logs in the console,
-run `docker logs mm-merge -f`.
+Detailed output is available in the browser while running the tool and in the container console. To view logs in the
+container run `docker logs -f mm-merge`.
 
 To view the logs without backgrounding the container, start the container without the `-d` flag and replace it
 with `-it`. Then, you can view the logs in the console and exit with `Ctrl+C`.
