@@ -84,30 +84,17 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
         }
     }
 
-    function massUpdateTables($oldUserId, $newUserId, $dryRun, $debug): void
+    function massUpdateTables($oldUserId, $newUserId, $dryRun, $debug, $playbooksEnabled, $boardsEnabled): void
     {
         // List of tables that contain the user ID
-        $tables = [
+        $primaryTables = [
             'audits' => 'userid',
             'channelmemberhistory' => 'userid',
             'commandwebhooks' => 'userid',
             'drafts' => 'userid',
             'emoji' => 'creatorid',
             'fileinfo' => 'creatorid',
-            'focalboard_blocks' => 'created_by',
-            'focalboard_blocks_history' => 'created_by',
-            'focalboard_board_members' => 'user_id',
-            'focalboard_board_members_history' => 'user_id',
-            'focalboard_boards_history' => 'created_by',
-            'focalboard_subscriptions' => 'subscriber_id',
             'incomingwebhooks' => 'userid',
-            'ir_category' => 'userid',
-            'ir_incident' => 'reporteruserid',
-            'ir_playbookautofollow' => 'userid',
-            'ir_playbookmember' => 'memberid',
-            'ir_run_participants' => 'userid',
-            'ir_timelineevent' => 'creatoruserid',
-            'ir_viewedchannel' => 'userid',
             'notifyadmin' => 'userid',
             'outgoingwebhooks' => 'creatorid',
             'postacknowledgements' => 'userid',
@@ -122,13 +109,76 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
             'useraccesstokens' => 'userid'
         ];
 
-        // Update each table with the new user ID
-        foreach ($tables as $table => $userIdColumn) {
+        $boardsTables = [
+            'focalboard_blocks' => 'created_by',
+            'focalboard_blocks_history' => 'created_by',
+            'focalboard_board_members' => 'user_id',
+            'focalboard_board_members_history' => 'user_id',
+            'focalboard_boards_history' => 'created_by',
+            'focalboard_subscriptions' => 'subscriber_id',
+        ];
+
+        $playbookTables = [
+            'ir_category' => 'userid',
+            'ir_incident' => 'reporteruserid',
+            'ir_playbookautofollow' => 'userid',
+            'ir_playbookmember' => 'memberid',
+            'ir_run_participants' => 'userid',
+            'ir_timelineevent' => 'creatoruserid',
+            'ir_viewedchannel' => 'userid',
+        ];
+
+        // Update each primaryTable with the new user ID
+        foreach ($primaryTables as $table => $userIdColumn) {
             updateTable($table, $userIdColumn, $oldUserId, $newUserId, $dryRun, $debug);
+        }
+
+        if ($boardsEnabled) {
+            foreach ($boardsTables as $table => $userIdColumn) {
+                updateTable($table, $userIdColumn, $oldUserId, $newUserId, $dryRun, $debug);
+            }
+        }
+
+        if ($playbooksEnabled) {
+            foreach ($playbookTables as $table => $userIdColumn) {
+                updateTable($table, $userIdColumn, $oldUserId, $newUserId, $dryRun, $debug);
+            }
         }
     }
 
-    massUpdateTables($oldUserId, $newUserId, $dryRun, $debug);
+    // Check if Boards tables exist
+    $checkBoardsEnabledQuery = "SELECT * FROM focalboard_system_settings LIMIT 1";
+    $checkBoardsEnabled = executeSELECTQuery($checkBoardsEnabledQuery);
+
+    if (!empty($checkBoardsEnabled)) {
+        $boardsEnabled = true;
+        if ($debug) {
+            syslog(LOG_DEBUG, "Boards enabled");
+        }
+    } else {
+        $boardsEnabled = false;
+        if ($debug) {
+            syslog(LOG_DEBUG, "Boards disabled");
+        }
+    }
+
+    // Check if Playbooks tables exist
+    $checkPlaybooksEnabledQuery = "SELECT * FROM ir_system LIMIT 1";
+    $checkPlaybooksEnabled = executeSELECTQuery($checkPlaybooksEnabledQuery);
+
+    if (!empty($checkPlaybooksEnabled)) {
+        $playbooksEnabled = true;
+        if ($debug) {
+            syslog(LOG_DEBUG, "Playbooks enabled");
+        }
+    } else {
+        $playbooksEnabled = false;
+        if ($debug) {
+            syslog(LOG_DEBUG, "Playbooks disabled");
+        }
+    }
+
+    massUpdateTables($oldUserId, $newUserId, $dryRun, $debug, $playbooksEnabled, $boardsEnabled);
 
     // Update channelmembers table with the new user ID where the newuserID is not already listed as a member
     $query = "UPDATE channelmembers SET userid = '$newUserId' WHERE userid = '$oldUserId' AND channelid NOT IN (SELECT channelid FROM channelmembers WHERE userid = '$newUserId') AND channelid IN (SELECT id FROM channels WHERE type = 'O' or type = 'G')";
@@ -206,45 +256,49 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     $query = "UPDATE channels SET creatorid = '$newUserId' WHERE creatorid = '$oldUserId'";
     processQuery('query_channel_creator', "Updating Channel Creator", $query, $dryRun, $debug);
 
-    // Update focalboard_blocks modified_by
-    $query = "UPDATE focalboard_blocks SET modified_by = '$newUserId' WHERE modified_by = '$oldUserId'";
-    processQuery('query_board_blocks', "Updating Board Blocks", $query, $dryRun, $debug);
+    if ($boardsEnabled) {
+        // Update focalboard_blocks modified_by
+        $query = "UPDATE focalboard_blocks SET modified_by = '$newUserId' WHERE modified_by = '$oldUserId'";
+        processQuery('query_board_blocks', "Updating Board Blocks", $query, $dryRun, $debug);
 
-    // Update focalboard_blocks modified_by
-    $query = "UPDATE focalboard_blocks_history SET modified_by = '$newUserId' WHERE modified_by = '$oldUserId'";
-    processQuery('query_board_blocks_history', "Updating Board Blocks History", $query, $dryRun, $debug);
+        // Update focalboard_blocks modified_by
+        $query = "UPDATE focalboard_blocks_history SET modified_by = '$newUserId' WHERE modified_by = '$oldUserId'";
+        processQuery('query_board_blocks_history', "Updating Board Blocks History", $query, $dryRun, $debug);
 
-    // Update boards history
-    $query = "UPDATE focalboard_boards_history SET modified_by = '$newUserId' WHERE modified_by = '$oldUserId'";
-    processQuery('query_board_history', "Updating Board History", $query, $dryRun, $debug);
+        // Update boards history
+        $query = "UPDATE focalboard_boards_history SET modified_by = '$newUserId' WHERE modified_by = '$oldUserId'";
+        processQuery('query_board_history', "Updating Board History", $query, $dryRun, $debug);
 
-    // Delete the old users focalboard preferences
-    $query = "DELETE FROM focalboard_preferences WHERE userid = '$oldUserId'";
-    processQuery('query_board_preferences', "Removing Board Preferences", $query, $dryRun, $debug);
+        // Delete the old users focalboard preferences
+        $query = "DELETE FROM focalboard_preferences WHERE userid = '$oldUserId'";
+        processQuery('query_board_preferences', "Removing Board Preferences", $query, $dryRun, $debug);
 
-    // Delete board sessions
-    $query = "DELETE FROM focalboard_sessions WHERE user_id = '$oldUserId' OR user_id = '$newUserId'";
-    processQuery('query_board_sessions', "Removing Board Sessions", $query, $dryRun, $debug);
+        // Delete board sessions
+        $query = "DELETE FROM focalboard_sessions WHERE user_id = '$oldUserId' OR user_id = '$newUserId'";
+        processQuery('query_board_sessions', "Removing Board Sessions", $query, $dryRun, $debug);
 
-    // Delete the old users board account
-    $query = "DELETE FROM focalboard_users WHERE id = '$oldUserId'";
-    processQuery('query_board_account', "Removing Board Account", $query, $dryRun, $debug);
+        // Delete the old users board account
+        $query = "DELETE FROM focalboard_users WHERE id = '$oldUserId'";
+        processQuery('query_board_account', "Removing Board Account", $query, $dryRun, $debug);
+    }
 
     // Replace the olduserID in groupmembers with the newuserID where the newuserID is not already listed in the same groupid
     $query = "UPDATE groupmembers SET userid = '$newUserId' WHERE userid = '$oldUserId' AND groupid NOT IN (SELECT groupid FROM groupmembers WHERE userid = '$newUserId')";
     processQuery('query_groupmembers', "Updating Group Members", $query, $dryRun, $debug);
 
-    // Update ir_incident with new commander
-    $query = "UPDATE ir_incident SET commanderuserid = '$newUserId' WHERE commanderuserid = '$oldUserId'";
-    processQuery('query_ir_incident_commander', "Updating Playbook Incident Commander", $query, $dryRun, $debug);
+    if ($playbooksEnabled) {
+        // Update ir_incident with new commander
+        $query = "UPDATE ir_incident SET commanderuserid = '$newUserId' WHERE commanderuserid = '$oldUserId'";
+        processQuery('query_ir_incident_commander', "Updating Playbook Incident Commander", $query, $dryRun, $debug);
 
-    // Update ir_incident checklistsjson with the new user ID
-    $query = "UPDATE ir_incident SET checklistsjson = (checklistsjson::text)::jsonb - '$oldUserId' || '\"$newUserId\"' WHERE checklistsjson::text LIKE '%$oldUserId%'";
-    processQuery('query_ir_incident_checklist', "Updating Playbook Incident Checklists", $query, $dryRun, $debug);
+        // Update ir_incident checklistsjson with the new user ID
+        $query = "UPDATE ir_incident SET checklistsjson = (checklistsjson::text)::jsonb - '$oldUserId' || '\"$newUserId\"' WHERE checklistsjson::text LIKE '%$oldUserId%'";
+        processQuery('query_ir_incident_checklist', "Updating Playbook Incident Checklists", $query, $dryRun, $debug);
 
-    // Update ir_timelineevent subjectuserid
-    $query = "UPDATE ir_timelineevent SET subjectuserid = '$newUserId' WHERE subjectuserid = '$oldUserId'";
-    processQuery('query_ir_timelineevent', "Updating Playbook Timeline Events", $query, $dryRun, $debug);
+        // Update ir_timelineevent subjectuserid
+        $query = "UPDATE ir_timelineevent SET subjectuserid = '$newUserId' WHERE subjectuserid = '$oldUserId'";
+        processQuery('query_ir_timelineevent', "Updating Playbook Timeline Events", $query, $dryRun, $debug);
+    }
 
     // Delete the old users oauth data
     $query = "DELETE FROM oauthaccessdata WHERE userid = '$oldUserId'";

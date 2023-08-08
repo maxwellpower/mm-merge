@@ -53,5 +53,5 @@ if (!isset($pdo)) {
 
 // Start Logging
 if (!isset($openlog)) {
-    $openLog = openlog("mm-merge", LOG_ODELAY, LOG_LOCAL0);
+    $openLog = openlog("MM-MERGE", LOG_ODELAY, LOG_LOCAL0);
 }

@@ -12,10 +12,6 @@
 // AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 // ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-document.addEventListener("load", function () {
-    console.log("Mattermost User Merge Tool Loaded!")
-});
-
 function confirmSubmit(event) {
 
     const dryrun = document.getElementById("dry_run_checkbox").checked;
@@ -24,16 +20,14 @@ function confirmSubmit(event) {
         if (!result) {
             event.preventDefault(); // Prevents the form from being submitted
         } else {
-            alert("Performing Dry Run!\n\nThis may take a while!\n\nPlease be patient!");
-            console.log("Performing Dry Run! Changes will NOT be committed.")
+            alert("Performing Dry Run!\n\nThis may take a while!\nPlease be patient!\n\nDetailed progress available in the system console!");
         }
     } else {
         const result = confirm("Are you sure you want to merge these users?\n\nChanges will be committed!\n\nThis cannot be undone!");
         if (!result) {
             event.preventDefault(); // Prevents the form from being submitted
         } else {
-            alert("Starting merge!\n\nThis may take a while!\n\nPlease be patient!");
-            console.log("Performing merge! Changes will be committed.")
+            alert("Performing Merge!\n\nThis may take a while!\nPlease be patient!\n\nDetailed progress available in the system console!");
         }
     }
 }
