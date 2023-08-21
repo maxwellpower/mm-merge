@@ -15,7 +15,7 @@
 name: Build and Publish Docker Container
 on:
   schedule:
-    - cron: '28 19 * * *'
+    - cron: '5 4 * * sun'
   push:
     branches: [ "main" ]
     tags: [ 'v*.*.*', 'latest' ]
@@ -55,6 +55,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check for Cron
+        id: check-schedule
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "::set-output name=tag::latest"
+          else
+            echo "::set-output name=tag::"
+          fi
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v4
@@ -64,6 +73,7 @@ jobs:
             type=ref,event=tag,enable=${{ endsWith(github.ref, 'tags/latest') }}
             type=sha
             type=ref,event=branch,exclude=latest
+            ${{ steps.check-schedule.outputs.tag }}
 
       - name: Build and push Docker image
         id: build-and-push
