@@ -15,7 +15,7 @@
 name: Build and Publish Docker Container
 on:
   schedule:
-    - cron: '5 4 * * sun'
+    - cron: '5 4 * * SUN'
   push:
     branches: [ "main" ]
     tags: [ 'v*.*.*', 'latest' ]

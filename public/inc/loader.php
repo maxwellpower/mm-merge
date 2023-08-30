@@ -31,11 +31,16 @@ $safeMode = getenv('SAFE_MODE');
 if ($safeMode) {
     syslog(LOG_INFO, "Safe mode enabled");
     $_SESSION['safe_mode'] = true;
+} else {
+    $_SESSION['safe_mode'] = false;
 }
+
 $debugUsers = getenv('DEBUG_USERS');
 if ($debugUsers) {
     syslog(LOG_INFO, "Debug users enabled");
     $_SESSION['debug_users'] = true;
+} else {
+    $_SESSION['debug_users'] = false;
 }
 
 if (!isset($pdo)) {

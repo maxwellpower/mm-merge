@@ -188,7 +188,7 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     $query = "DELETE from productnoticeviewstate WHERE userid = '$oldUserId'";
     processQuery('query_productnoticeviewstate', "Removing Product Notice View State", $query, $dryRun, $debug);
 
-    // Update DM Posts
+    // Update users personal DM channel
     $olddmchannelname = $oldUserId . '__' . $oldUserId;
     $query = "SELECT id FROM channels WHERE name = '$olddmchannelname' AND type = 'D'";
     $results = executeSELECTQuery($query);
@@ -201,7 +201,7 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
 
     if (empty($olddmchannelid) || empty($newdmchannelid)) {
         echo '<div id="query_update_dm_posts" class="row mb-1"><div class="col alert alert-secondary">';
-        echo '<h4>Updating DM Posts ...</h4>';
+        echo '<h4>Updating Users Personal DM\'s ...</h4>';
         if (empty($olddmchannelid)) {
             echo "<code>Could not find old DM channel ID</code><br><br>";
         } elseif (empty($newdmchannelid)) {
@@ -209,18 +209,19 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
         } else {
             echo "<code>Could not find old or new DM channel ID</code><br><br>";
         }
-        echo "</div></div>";
+        echo "<p>No DM Channel. Skipping Update ...</p></div></div>";
     } else {
         $query = "UPDATE posts SET channelid = '$newdmchannelid' WHERE channelid = '$olddmchannelid'";
-        processQuery('query_update_dm_posts', "Updating DM Posts", $query, $dryRun, $debug);
+        processQuery('query_update_dm_posts', "Updating Users Personal DM Posts", $query, $dryRun, $debug);
+
+        // Remove users DM channel
+        $query = "DELETE FROM channels WHERE name = '$olddmchannelname' AND type = 'D'";
+        processQuery('query_remove_old_dm', "Removing Users Personal DM Channel", $query, $dryRun, $debug);
+
     }
 
-    // Remove users DM channel
-    $query = "DELETE FROM channels WHERE name = '$olddmchannelname' AND type = 'D'";
-    processQuery('query_remove_old_dm', "Removing Users DM Channel", $query, $dryRun, $debug);
-
     // Fetch DM channels involving the old user
-    $query = "SELECT id, name FROM channels WHERE type = 'D' AND (name LIKE '$oldUserId__%' OR name LIKE '%__$oldUserId')";
+    $query = "SELECT id, name FROM channels WHERE type = 'D' AND (name LIKE '$oldUserId\__%' OR name LIKE '%__$oldUserId')";
     $results = executeSELECTQuery($query);
 
     $iteration = 1;
@@ -235,8 +236,10 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
         // Construct the new name
         if ($user1 == $oldUserId) {
             $newName = $newUserId . '__' . $user2;
-        } else {
+        } else if ($user2 == $oldUserId) {
             $newName = $user1 . '__' . $newUserId;
+        } else {
+            break;
         }
 
         // Update the channel name

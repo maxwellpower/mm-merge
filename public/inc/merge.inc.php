@@ -128,7 +128,7 @@ syslog(LOG_INFO, "Merging user $oldUsername ($oldUserId) into $newUsername ($new
         if ($dryRun && empty($mergeUsers)) {
             // Generate a new hidden form and submit button that will actually complete the merge
             ?>
-            <form id="users" method="post">
+            <form id="complete_user_merge" method="post">
                 <input type="text" name="old_user_id" id="old_user_id" hidden="hidden"
                        value="<?= $_POST['old_user_id']; ?>">
                 <input type="text" name="new_user_id" id="new_user_id" hidden="hidden"
