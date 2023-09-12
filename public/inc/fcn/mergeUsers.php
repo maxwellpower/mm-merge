@@ -181,7 +181,7 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     massUpdateTables($oldUserId, $newUserId, $dryRun, $debug, $playbooksEnabled, $boardsEnabled);
 
     // Update channelmembers table with the new user ID where the newuserID is not already listed as a member
-    $query = "UPDATE channelmembers SET userid = '$newUserId' WHERE userid = '$oldUserId' AND channelid NOT IN (SELECT channelid FROM channelmembers WHERE userid = '$newUserId') AND channelid IN (SELECT id FROM channels WHERE type = 'O' or type = 'G')";
+    $query = "UPDATE channelmembers SET userid = '$newUserId' WHERE userid = '$oldUserId' AND channelid NOT IN (SELECT channelid FROM channelmembers WHERE userid = '$newUserId') AND channelid IN (SELECT id FROM channels WHERE type = 'O' or type = 'G' or type = 'P')";
     processQuery('query_channelmembers', "Updating Channel Members", $query, $dryRun, $debug);
 
     // Update the productnoticeviewstate table with the new user ID
@@ -380,16 +380,20 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     processQuery("query_delete_old_account", "Removing Old Account", $query, $dryRun, $debug);
 
     // Reset authdata if requested
-    if ($_POST['force_authdata_checkbox']) {
+    if (isset($_POST['force_authdata_checkbox']) && $_POST['force_authdata_checkbox']) {
         $query = "UPDATE users SET authdata = NULL WHERE id = '$newUserId'";
         processQuery('query_update_authdata', "Resetting authdata", $query, $dryRun, $debug);
     }
 
     // Reset email if requested
-    handleUserUpdate('email', $_POST['force_email'] ?? '', 'force_email_checkbox', 'query_update_email', $oldUserId, $newUserId, $dryRun, $debug);
+    if (isset($_POST['force_email_checkbox']) && $_POST['force_email_checkbox']) {
+        handleUserUpdate('email', $_POST['force_email'] ?? '', 'force_email_checkbox', 'query_update_email', $oldUserId, $newUserId, $dryRun, $debug);
+    }
 
     // Reset username if requested
-    handleUserUpdate('username', $_POST['force_username'] ?? '', 'force_username_checkbox', 'query_update_username', $oldUserId, $newUserId, $dryRun, $debug);
+    if (isset($_POST['force_username_checkbox']) && $_POST['force_username_checkbox']) {
+        handleUserUpdate('username', $_POST['force_username'] ?? '', 'force_username_checkbox', 'query_update_username', $oldUserId, $newUserId, $dryRun, $debug);
+    }
 
     // Ensure the user account is enabled and has no deleted date set
     $query = "UPDATE users SET deleteat = 0 WHERE id = '$newUserId'";
