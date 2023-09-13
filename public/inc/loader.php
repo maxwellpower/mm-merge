@@ -19,6 +19,11 @@ ini_set('max_execution_time', -1);
 ini_set('max_input_time', -1);
 ini_set('memory_limit', -1);
 
+// Start Logging
+if (!isset($openlog)) {
+    $openLog = openlog("MM-MERGE", LOG_ODELAY, LOG_LOCAL0);
+}
+
 // Database configuration
 $DB_HOST = getenv('DB_HOST');
 $DB_PORT = getenv('DB_PORT') ?: 5432;
@@ -54,9 +59,4 @@ if (!isset($pdo)) {
         syslog(LOG_ERR, "Connection failed: " . $e->getMessage());
         die("Connection failed: " . $e->getMessage());
     }
-}
-
-// Start Logging
-if (!isset($openlog)) {
-    $openLog = openlog("MM-MERGE", LOG_ODELAY, LOG_LOCAL0);
 }

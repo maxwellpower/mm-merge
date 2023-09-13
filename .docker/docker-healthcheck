@@ -14,19 +14,36 @@
 # AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-function _healthcheck_failed() {
-  echo "$1"
+function log_message() {
+  local message="$1"
+  echo "$(date +'%Y-%m-%dT%H:%M:%S.%6N%:z') ${HOSTNAME} HEALTHCHECK[$$]: $message"
+}
+
+function healthcheck_failed() {
+  local message="$1"
+  log_message "$message, EXITING"
   exit 1
 }
 
-function _healthcheck() {
-  pgrep -x rsyslogd >/dev/null || _healthcheck_failed "SYSLOG HEALTHCHECK FAILED"
-  pgrep -x apache2 >/dev/null || _healthcheck_failed "APACHE2 HEALTHCHECK FAILED"
-  echo "$(date +'%b %d %H:%M:%S') ""${HOSTNAME}"" HEALTHCHECK[$$]: OK"
+function healthcheck() {
+  pgrep -x rsyslogd >/dev/null || healthcheck_failed "SYSLOG NOT FOUND"
+  pgrep -x apache2 >/dev/null || healthcheck_failed "APACHE2 NOT FOUND"
 }
 
-echo "Starting HEALTHCHECK ..."
+log_message "ONLINE"
+
+CHECK_INTERVAL=15
+OK_INTERVAL=200
+
+counter=0
 while true; do
-  _healthcheck
-  sleep 120
+  healthcheck
+  counter=$((counter + CHECK_INTERVAL))
+
+  if ((counter >= OK_INTERVAL)); then
+    log_message "OK"
+    counter=0
+  fi
+
+  sleep $CHECK_INTERVAL
 done
