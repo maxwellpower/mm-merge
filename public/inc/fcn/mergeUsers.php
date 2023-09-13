@@ -42,6 +42,7 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
 
     function processQuery($id, $heading, $query, $dryRun, $debug): false|array|null
     {
+        syslog(LOG_INFO, $heading);
         echo "<div id='$id' class='row mb-1'><div class='col alert alert-secondary'>";
         echo "<h4>$heading ...</h4>";
         try {
