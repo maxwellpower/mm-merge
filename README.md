@@ -1,21 +1,24 @@
-# Mattermost User Merge Tool
+# Mattermost User Merge
 
-GUI tool to facilitate forcefully merging two Mattermost users into one.
+GUI/CLI tool to facilitate forcefully merging two Mattermost users into one.
 
-**This tool only supports Mattermost installs using a Postgres Database.**
+**This tool ONLY supports Mattermost installs using a Postgres Database.**
+Mattermost installs using a MySQL database are not supported by this tool!
 
 ## Important Warnings
 
 1. **Destructive Operations**: This tool performs destructive operations on the database. The user being merged is
-   completely deleted from the system after the merge.
+   completely deleted from the system after the merge. There is no ability to recover your data after the merge is
+   complete, besides a database restore!
 2. **Backup**: Always back up your Mattermost database before using this tool. This ensures you can recover data in case
-   of any issues.
-3. **Testing**: Test this tool in a non-production or staging environment before using it live.
-4. **Database Version**: Ensure that the tool is compatible with the version of the Mattermost database you're using.
-   Database schemas can change over time.
-5. **No Direct Support**: This script is not directly supported by Mattermost. It was created for use by the Mattermost
-   Customer Success team. Please do not contact the Mattermost support team for support of this script.
-6. **Security**: Ensure that database connections are secure and sensitive data is handled appropriately.
+   of any issues!
+3. **Testing**: Always test this tool in a non-production or staging environment before using it live! This ensures you
+   understand how the tool works and can recover from any issues, should they arise.
+4. **Database Version**: Ensure the tool is still compatible with the version of the Mattermost database you're using.
+   Database schemas can change over time. This tool was last tested on Mattermost `v8.1`.
+5. **No Direct Support**: This script is not directly supported by the Mattermost Support Team. It's designed for use
+   by the Mattermost Customer Success Team. Please do not contact the Mattermost Support Team for support of this
+   script. This script should only be run after consultation with a member of the Mattermost Customer Success Team.
 
 ## Usage
 
