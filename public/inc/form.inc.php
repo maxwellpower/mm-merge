@@ -34,7 +34,7 @@ if ($_SESSION['debug_users']) {
     if ($usersLogWrite) {
         syslog(LOG_INFO, "Successfully exported users list to logs/users.json.");
     } else {
-        syslog(LOG_INFO, "Failed to export users list.");
+        syslog(LOG_ERR, "Failed to export users list.");
     }
 }
 ?>

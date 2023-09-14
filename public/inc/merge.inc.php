@@ -94,14 +94,14 @@ syslog(LOG_INFO, "Merging user $oldUsername ($oldUserId) into $newUsername ($new
                 } else {
                     $debugMergeOutputCount = count($mergeUsers);
                     $debugMergeOutput = json_encode($mergeUsers, JSON_PRETTY_PRINT);
-                    syslog(LOG_ERR, "Found $debugMergeOutputCount errors during merge. Exporting log to logs/merge.json");
+                    syslog(LOG_ALERT, "Found $debugMergeOutputCount errors during merge. Exporting log to logs/merge.json");
                     $mergeLog = fopen($_SERVER['DOCUMENT_ROOT'] . "/logs/merge.json", "w") or die("Unable to open file!");
                     $mergeLogWrite = fwrite($mergeLog, $debugMergeOutput);
                     $mergeLog = fclose($mergeLog);
                     if ($mergeLogWrite) {
                         syslog(LOG_INFO, "Successfully exported errors to logs/merge.json.");
                     } else {
-                        syslog(LOG_INFO, "Failed to export users list.");
+                        syslog(LOG_WARNING, "Failed to export users list.");
                     }
                     // Output all failures
                     echo "<div class='alert alert-danger text-center'><strong><i class='bi bi-exclamation-circle-fill'></i> User merge completed with errors!</strong></div>";

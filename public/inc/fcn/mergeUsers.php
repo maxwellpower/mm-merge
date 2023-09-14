@@ -154,12 +154,12 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     if (!empty($checkBoardsEnabled)) {
         $boardsEnabled = true;
         if ($debug) {
-            syslog(LOG_DEBUG, "Boards enabled");
+            syslog(LOG_INFO, "Boards enabled");
         }
     } else {
         $boardsEnabled = false;
         if ($debug) {
-            syslog(LOG_DEBUG, "Boards disabled");
+            syslog(LOG_NOTICE, "Boards disabled");
         }
     }
 
@@ -170,12 +170,12 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     if (!empty($checkPlaybooksEnabled)) {
         $playbooksEnabled = true;
         if ($debug) {
-            syslog(LOG_DEBUG, "Playbooks enabled");
+            syslog(LOG_INFO, "Playbooks enabled");
         }
     } else {
         $playbooksEnabled = false;
         if ($debug) {
-            syslog(LOG_DEBUG, "Playbooks disabled");
+            syslog(LOG_NOTICE, "Playbooks disabled");
         }
     }
 

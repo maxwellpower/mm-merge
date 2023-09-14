@@ -56,7 +56,7 @@ if (!isset($pdo)) {
         $pdo = new PDO($dsn);
         syslog(LOG_INFO, "Connected to database");
     } catch (PDOException $e) {
-        syslog(LOG_ERR, "Connection failed: " . $e->getMessage());
+        syslog(LOG_EMERG, "Connection failed: " . $e->getMessage());
         die("Connection failed: " . $e->getMessage());
     }
 }
