@@ -33,7 +33,7 @@ function healthcheck() {
 log_message "ONLINE"
 
 CHECK_INTERVAL=15
-OK_INTERVAL=200
+OK_INTERVAL=300
 
 counter=0
 while true; do

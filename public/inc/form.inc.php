@@ -27,14 +27,14 @@ $users = executeSELECTQuery($query);
 if ($_SESSION['debug_users']) {
     $debugUsersCount = count($users);
     $debugUsersOutput = json_encode($users, JSON_PRETTY_PRINT);
-    syslog(LOG_INFO, "Found $debugUsersCount users on $DB_HOST. Exporting users list to logs/users.json");
+    syslog(LOG_INFO, "[INFO][USERS]: $debugUsersCount Users - Exporting ...");
     $usersLog = fopen($_SERVER['DOCUMENT_ROOT'] . "/logs/users.json", "w") or die("Unable to open file!");
     $usersLogWrite = fwrite($usersLog, $debugUsersOutput);
     $usersLog = fclose($usersLog);
     if ($usersLogWrite) {
-        syslog(LOG_INFO, "Successfully exported users list to logs/users.json.");
+        syslog(LOG_INFO, "[INFO][USERS]: Successfully exported to //{HOSTNAME}:{PORT}/logs/users.json.");
     } else {
-        syslog(LOG_ERR, "Failed to export users list.");
+        syslog(LOG_ERR, "[ERROR][USERS]: Failed to export users list.");
     }
 }
 ?>

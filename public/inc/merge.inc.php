@@ -58,7 +58,7 @@ try {
     $oldUsername = "Unknown";
 }
 
-syslog(LOG_INFO, "Merging user $oldUsername ($oldUserId) into $newUsername ($newUserId)");
+syslog(LOG_NOTICE, "[NOTICE][APP]: MERGING $oldUsername ($oldUserId) -> $newUsername ($newUserId)");
 ?>
 <div class="row">
     <div class="col-8 offset-2">
@@ -89,19 +89,19 @@ syslog(LOG_INFO, "Merging user $oldUsername ($oldUserId) into $newUsername ($new
 
                 // Check if error array is empty
                 if (empty($mergeUsers)) {
-                    syslog(LOG_INFO, "User merge completed successfully!");
+                    syslog(LOG_INFO, "[INFO][APP]: MERGE SUCCESSFUL!");
                     echo "<div class='alert alert-success text-center'><strong><i class='bi bi-check-circle-fill'></i> User merge completed successfully!</strong></div>";
                 } else {
                     $debugMergeOutputCount = count($mergeUsers);
                     $debugMergeOutput = json_encode($mergeUsers, JSON_PRETTY_PRINT);
-                    syslog(LOG_ALERT, "Found $debugMergeOutputCount errors during merge. Exporting log to logs/merge.json");
+                    syslog(LOG_ALERT, "[ALERT][MERGE]: $debugMergeOutputCount ERRORS during merge. Exporting errors ...");
                     $mergeLog = fopen($_SERVER['DOCUMENT_ROOT'] . "/logs/merge.json", "w") or die("Unable to open file!");
                     $mergeLogWrite = fwrite($mergeLog, $debugMergeOutput);
                     $mergeLog = fclose($mergeLog);
                     if ($mergeLogWrite) {
-                        syslog(LOG_INFO, "Successfully exported errors to logs/merge.json.");
+                        syslog(LOG_INFO, "[INFO][MERGE]: Successfully exported errors to ://{HOST}:{PORT}/logs/merge.json.");
                     } else {
-                        syslog(LOG_WARNING, "Failed to export users list.");
+                        syslog(LOG_WARNING, "[WARNING][MERGE]: Failed to export users list.");
                     }
                     // Output all failures
                     echo "<div class='alert alert-danger text-center'><strong><i class='bi bi-exclamation-circle-fill'></i> User merge completed with errors!</strong></div>";

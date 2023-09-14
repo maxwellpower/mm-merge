@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 } // Display the form
 else {
-    syslog(LOG_INFO, "User Merge Tool Loaded");
+    syslog(LOG_INFO, "[INFO][APP]: INTERFACE LOADED");
     ?>
     <div class="row">
         <div class="col text-center">

@@ -34,29 +34,32 @@ $DB_PASSWORD = getenv('DB_PASSWORD');
 // Other configuration
 $safeMode = getenv('SAFE_MODE');
 if ($safeMode) {
-    syslog(LOG_INFO, "Safe mode enabled");
     $_SESSION['safe_mode'] = true;
+    syslog(LOG_NOTICE, "[NOTICE][APP]: Safe Mode ENABLED!");
 } else {
     $_SESSION['safe_mode'] = false;
+    syslog(LOG_INFO, "[INFO][APP]: Safe Mode DISABLED!");
 }
 
 $debugUsers = getenv('DEBUG_USERS');
 if ($debugUsers) {
-    syslog(LOG_INFO, "Debug users enabled");
     $_SESSION['debug_users'] = true;
+    syslog(LOG_NOTICE, "[NOTICE][APP]: User Debug ENABLED!");
 } else {
     $_SESSION['debug_users'] = false;
+    syslog(LOG_INFO, "[INFO][APP]: User Debug DISABLED!");
 }
 
 if (!isset($pdo)) {
-    syslog(LOG_INFO, "Connecting to PostgresSQL database");
+    syslog(LOG_INFO, "[INFO][APP]: Establishing Database Connection ...");
     // Create a PDO connection to the PostgresSQL database
     try {
         $dsn = "pgsql:host=$DB_HOST;port=$DB_PORT;dbname=$DB_NAME;user=$DB_USER;password=$DB_PASSWORD";
+        $dsn_log = "pgsql:host=$DB_HOST;port=$DB_PORT;dbname=$DB_NAME;user=$DB_USER";
         $pdo = new PDO($dsn);
-        syslog(LOG_INFO, "Connected to database");
+        syslog(LOG_INFO, "[INFO][APP]: CONNECTED TO " . $dsn_log);
     } catch (PDOException $e) {
-        syslog(LOG_EMERG, "Connection failed: " . $e->getMessage());
-        die("Connection failed: " . $e->getMessage());
+        syslog(LOG_EMERG, "[EMERG][APP]: COULD NOT CONNECT TO " . $dsn_log . " {ERROR}: " . $e->getMessage());
+        die("DATABASE CONNECTION FAILED: " . $e->getMessage());
     }
 }

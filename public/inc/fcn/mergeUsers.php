@@ -42,7 +42,7 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
 
     function processQuery($id, $heading, $query, $dryRun, $debug): false|array|null
     {
-        syslog(LOG_INFO, $heading);
+        syslog(LOG_INFO, "[INFO][MERGE][TASK]: " . $heading);
         echo "<div id='$id' class='row mb-1'><div class='col alert alert-secondary'>";
         echo "<h4>$heading ...</h4>";
         try {
@@ -50,7 +50,7 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
         } catch (Exception $e) {
             echo "Error $heading: <code>" . $e->getMessage() . "</code><br><br>";
             handleDatabaseQueryFailure($query, $e, $id);
-            syslog(LOG_ERR, "Merge Error in $heading: " . $e->getMessage());
+            syslog(LOG_ERR, "[ERROR][MERGE][TASK]: " . $e->getMessage());
             executeRollbackChanges();
             return null;
         } finally {
@@ -154,12 +154,12 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     if (!empty($checkBoardsEnabled)) {
         $boardsEnabled = true;
         if ($debug) {
-            syslog(LOG_INFO, "Boards enabled");
+            syslog(LOG_INFO, "[INFO][APP]: BOARDS ENABLED!");
         }
     } else {
         $boardsEnabled = false;
         if ($debug) {
-            syslog(LOG_NOTICE, "Boards disabled");
+            syslog(LOG_NOTICE, "[NOTICE][APP]: BOARDS DISABLED!");
         }
     }
 
@@ -170,12 +170,12 @@ function mergeUsers($oldUserId, $oldUsername, $newUserId, $newUsername, $dryRun,
     if (!empty($checkPlaybooksEnabled)) {
         $playbooksEnabled = true;
         if ($debug) {
-            syslog(LOG_INFO, "Playbooks enabled");
+            syslog(LOG_INFO, "[INFO][APP]: PLAYBOOKS ENABLED!");
         }
     } else {
         $playbooksEnabled = false;
         if ($debug) {
-            syslog(LOG_NOTICE, "Playbooks disabled");
+            syslog(LOG_NOTICE, "[NOTICE][APP]: PLAYBOOKS DISABLED!");
         }
     }
 

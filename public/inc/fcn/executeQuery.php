@@ -26,33 +26,33 @@ function executeQuery($query, $dryRun = true, $debug = true): false|array
     $stmt = $pdo->prepare($query);
     $stmt->execute();
     if ($debug) {
-        syslog(LOG_DEBUG, "Running Query: $query");
+        syslog(LOG_DEBUG, "[DEBUG][MERGE]: Running Query: $query");
         echo "<div class='row'><div class='col'><p><strong>QUERY</strong>: <code>$query</code></p><p><strong>RESULTS</strong>:</p>";
         echo "<div class='row bg-dark border border-dark border-3 rounded mb-3 mt-3'><div class='col'><pre class='mt-2 text-light overflow-auto'><code>";
         $queryResult = json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_PRETTY_PRINT);
-        syslog(LOG_DEBUG, "Query Results: $queryResult");
+        syslog(LOG_DEBUG, "[DEBUG][MERGE]: Query Results: $queryResult");
         print_r($queryResult);
         echo "</code></pre></div></div>";
     }
     if ($_SESSION['safe_mode']) {
         $pdo->rollBack();
         if ($debug) {
-            syslog(LOG_DEBUG, "This was a safe mode run! Changes were not committed.");
-            echo "<p class='alert alert-warning'><strong>NOTE</strong>: This was a safe mode run! Changes were not committed.</p></div></div>";
+            syslog(LOG_DEBUG, "[DEBUG][MERGE]: SAFE MODE - Changes NOT Committed!");
+            echo "<p class='alert alert-warning'><strong>NOTE</strong>: This was a safe mode run! Changes were <b>NOT</b> committed.</p></div></div>";
         }
         return false;
     }
     if ($dryRun) {
         $pdo->rollBack();
         if ($debug) {
-            syslog(LOG_DEBUG, "This was a dry run! Changes were not committed.");
-            echo "<p class='alert alert-success'><strong>NOTE</strong>: This was a dry run! Changes were not committed.</p></div></div>";
+            syslog(LOG_DEBUG, "[DEBUG][MERGE]: DRY RUN - Changes NOT Committed!");
+            echo "<p class='alert alert-success'><strong>NOTE</strong>: This was a dry run! Changes were <b>NOT</b> committed.</p></div></div>";
         }
         return false;
     } else {
         $pdo->commit();
         if ($debug) {
-            syslog(LOG_DEBUG, "Changes were committed!");
+            syslog(LOG_DEBUG, "[DEBUG][MERGE]: Changes Committed!");
             echo "<p class='alert alert-success'><strong>NOTE</strong>: Changes were committed!</p></div></div>";
         }
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
