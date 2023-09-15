@@ -15,10 +15,15 @@
 
 require_once 'inc/loader.php';
 require 'inc/header.php';
+
+/**
+ * @var string $APP_VERSION
+ */
+
 ?>
     <div class="row">
         <div class="col text-center">
-            <h1>Mattermost User Account Merge Tool</h1>
+            <h1>Mattermost User Account Merge Tool (<small><code>v<?= $APP_VERSION; ?></code></small>)</h1>
         </div>
     </div>
 <?php

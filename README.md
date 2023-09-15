@@ -29,7 +29,9 @@ enter them as environment variables.
 
 ### Docker
 
-- With environment variables:
+#### Backrounded Container
+
+##### Environment Variables
 
 ```bash
 docker run -d -p 8080:80 -p 8443:443 --rm --name mm-merge \
@@ -41,12 +43,34 @@ docker run -d -p 8080:80 -p 8443:443 --rm --name mm-merge \
   ghcr.io/maxwellpower/mm-merge
 ```
 
-- With the included .env file:
+##### `.env` File
 
 ```bash
 cp default.env .env
 vi .env
 docker run -d --rm --name mm-merge -p 8080:80 -p 8443:443 --env-file=.env ghcr.io/maxwellpower/mm-merge
+```
+
+#### Interactive Container
+
+##### Environment Variables
+
+```bash
+docker run -it -p 8080:80 -p 8443:443 --rm --name mm-merge \
+  -e DB_USER=<Database User> \
+  -e DB_PASSWORD=<Database Password> \
+  -e DB_HOST=<Database Hostname> \
+  -e DB_NAME=mattermost \
+  #-e DB_PORT=<your_DB_PORT> \ # Optional, defaults to 5432
+  ghcr.io/maxwellpower/mm-merge
+```
+
+##### `.env` File
+
+```bash
+cp default.env .env
+vi .env
+docker run -it --rm --name mm-merge -p 8080:80 -p 8443:443 --env-file=.env ghcr.io/maxwellpower/mm-merge
 ```
 
 ### Command Line Only

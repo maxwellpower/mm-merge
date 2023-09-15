@@ -13,6 +13,8 @@
 # AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+$APP_VERSION = '1.0.0';
+
 session_start();
 ob_start();
 ini_set('max_execution_time', -1);
@@ -22,6 +24,11 @@ ini_set('memory_limit', -1);
 // Start Logging
 if (!isset($openlog)) {
     $openLog = openlog("MM-MERGE", LOG_ODELAY, LOG_LOCAL0);
+    if ($openLog) {
+        syslog(LOG_INFO, "[INFO][APP]: Started MM-MERGE (v$APP_VERSION)");
+    } else {
+        die("Logging Failed to Start");
+    }
 }
 
 // Database configuration
