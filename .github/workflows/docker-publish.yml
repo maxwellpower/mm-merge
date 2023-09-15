@@ -64,6 +64,14 @@ jobs:
             echo "::set-output name=tag::"
           fi
 
+      - name: Check for Version Tag
+        id: check-version-tag
+        run: |
+          VERSION_TAG=$(echo ${{ github.ref }} | sed -n 's/refs\/tags\/v\([0-9.]*\)$/\1/p')
+          if [[ -n "$VERSION_TAG" ]]; then
+            echo "::set-output name=version-tag::${VERSION_TAG}"
+          fi
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v4
@@ -73,6 +81,7 @@ jobs:
             type=ref,event=tag,enable=${{ endsWith(github.ref, 'tags/latest') }}
             type=sha
             type=ref,event=branch,exclude=latest
+            ${{ steps.check-version-tag.outputs.version-tag }}
             ${{ steps.check-schedule.outputs.tag }}
 
       - name: Build and push Docker image
